@@ -34,6 +34,17 @@ codebook <- read_sheet(sheet_id,
                        col_types = "ccccccD")
 
 
+left_join_codebook <- function(df, tablename, field){
+
+codebook.short <- codebook %>%
+    filter(table == tablename,
+           field_name == field) %>%
+    select(variable,definition)
+
+    left_join(df, codebook.short, by = setNames( "variable", field))
+    
+}
+
 
 
 
@@ -65,10 +76,10 @@ enrollment <- tbl(con, "ENROLLMENT")  %>%
  ) %>%
   collect()
 
-codebook.enr <- codebook %>%
-    filter(table == "ENROLLMENT",
-           field_name == "ETHNIC") %>%
-    select(variable,definition)
+# codebook.enr <- codebook %>%
+#     filter(table == "ENROLLMENT",
+#            field_name == "ETHNIC") %>%
+#     select(variable,definition)
 
 enrollment.sum <- enrollment %>%
     filter(YEAR == max(YEAR)) %>%
@@ -76,13 +87,13 @@ enrollment.sum <- enrollment %>%
     summarise(TOTAL = sum(ENR_TOTAL)) %>%
     mutate(ETHNIC = as.character(ETHNIC),
            Percent = TOTAL/sum(TOTAL)) %>%
-    left_join(codebook.enr, by = c("ETHNIC" = "variable"))
+    left_join_codebook("ENROLLMENT", "ETHNIC" )
 
 county.sum <- enrollment.sum %>%
     group_by(ETHNIC) %>% 
     summarise(GRAND.TOTAL = sum(TOTAL)) %>%
     mutate(Percent = GRAND.TOTAL/sum(GRAND.TOTAL))%>%
-    left_join(codebook.enr, by = c("ETHNIC" = "variable"))
+    left_join_codebook("ENROLLMENT", "ETHNIC" )
 
 ggplot(county.sum, aes(x = reorder(definition, GRAND.TOTAL ), y = GRAND.TOTAL, label = percent(Percent))) +
     geom_col() +
@@ -197,7 +208,26 @@ ggplot(susp_sub, aes( y = suspension_rate_total/100, x =fct_reorder(StudentGroup
 
 # Generated from the CAASPP repo
 
-sbac.all <- 
+sbac.all <- tbl(con,"CAASPP") %>% 
+    filter(
+        Test_Year == "2019",
+        Grade == "13",
+        County_Code == 27,
+        Subgroup_ID == 1 | Subgroup_ID >70 & Subgroup_ID <81
+    ) %>% 
+    head(50) %>%
+    collect()
+
+codebook.caaspp <- sbac.all %>%
+    mutate(Subgroup_ID = as.character(Subgroup_ID)) %>%
+    left_join_codebook("CAASPP","Subgroup_ID")
+
+
+
+
+
+
+
 
 sbac.all <-   read_rds(here("data","sbac-all.rds"))
 
