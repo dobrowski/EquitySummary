@@ -220,7 +220,52 @@ sbac.all <- tbl(con,"CAASPP") %>%
 
 codebook.caaspp <- sbac.all %>%
     mutate(Subgroup_ID = as.character(Subgroup_ID)) %>%
-    left_join_codebook("CAASPP","Subgroup_ID")
+    left_join_codebook("CAASPP","Subgroup_ID") %>%
+    mutate(Percentage_Standard_Met_and_Above = as.numeric(Percentage_Standard_Met_and_Above))
+
+test <- "Math"
+
+  ggplot(codebook.caaspp, aes( y = Percentage_Standard_Met_and_Above/100, x =fct_reorder(definition, Percentage_Standard_Met_and_Above) ,  label = percent(Percentage_Standard_Met_and_Above/100, accuracy = .1))) +
+  geom_segment( aes(x=fct_reorder(definition, Percentage_Standard_Met_and_Above/100), xend=fct_reorder(definition, Percentage_Standard_Met_and_Above/100), y=0, yend=Percentage_Standard_Met_and_Above/100),
+                color="orange",
+                size =2 ) +
+  geom_point( color="orange", size=5, alpha=0.6) +
+  coord_flip() +
+  geom_text(size = 3, color = "black") +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+#  facet_grid(facets = vars(`Student Group`), scales = "free" ) +
+  theme_hc() +
+  mcoe_theme +
+  labs(x = "",
+       y = "",
+       color ="",
+       title = (paste0(test, " Percentage Meeting and Exceeding Rates by Student Group")),
+       caption = "Source: CAASPP Research Files \n https://caaspp-elpac.cde.ca.gov/caaspp/ResearchFileList")
+
+
+
+lollipop <- function(df, y_var, x_var, colorme) {
+  ggplot(df, aes( y = {{y_var}}/100, x =fct_reorder({{x_var}}, {{y_var}}) ,  label = percent({{y_var}}/100, accuracy = .1))) +
+  geom_segment( aes(x=fct_reorder({{x_var}}, {{y_var}}/100), xend=fct_reorder({{x_var}}, {{y_var}}/100), y=0, yend={{y_var}}/100),
+                color=colorme,
+                size =2 ) +
+  geom_point( color=colorme, size=5, alpha=0.6) +
+  coord_flip() +
+  geom_text(size = 3, color = "black") +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+#  facet_grid(facets = vars(`Student Group`), scales = "free" ) +
+  theme_hc() +
+  mcoe_theme
+}
+
+
+codebook.caaspp %>%
+    filter(District_Code == "00000",
+           Test_Id == 1) %>%
+    lollipop(
+         y_var = Percentage_Standard_Met_and_Above,
+         x_var = definition,
+         colorme = "green")
 
 
 
@@ -229,9 +274,8 @@ codebook.caaspp <- sbac.all %>%
 
 
 
-sbac.all <-   read_rds(here("data","sbac-all.rds"))
 
-sbac.all.multi <-   read_rds(here("data","sbac-all-multi.rds"))
+
 
 sbac.filtered <- sbac.all.multi %>%
   filter(
@@ -267,7 +311,7 @@ ggplot( aes(x = Year, y = value/100, group = Geo, color = Geo , linetype = Geo, 
        title = (paste0(test, " Percentage Meeting and Exceeding Rates Over Time")),
        caption = "Source: CAASPP Research Files \n https://caaspp-elpac.cde.ca.gov/caaspp/ResearchFileList")
 
-ggsave(here("figs","2021",paste0(test,".png")), width = 6, height = 4)
+
 
 
 sbac.filtered %>%
