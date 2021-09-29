@@ -1,0 +1,117 @@
+---
+title: "Equity Summary"
+author: "David Dobrowski"
+date: "9/29/2021"
+output: powerpoint_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE , message=FALSE)
+
+library(here)
+library(rmarkdown)
+library(knitr)
+library(tidyverse)
+library(glue)
+library(readxl)
+library(MCOE)
+library(ggthemes)
+library(googlesheets4)
+library(scales)
+
+options(scipen=999)
+
+
+con <- MCOE::mcoe_sql_con()
+
+```
+
+## Teacher Demographics - Countywide
+
+A look at teacher demographics 
+
+## Teacher Demographics - By District
+
+A look at teacher demographics 
+
+
+## Student Demographics - Countywide
+
+A look at student demographics
+```{r enrollment, echo = TRUE}
+
+enrollment <- tbl(con, "CGR")  %>%
+  filter( AggregateLevel %in% c("T", "C"),
+          CountyCode %in% c("27"), 
+#          CountyCode %in% c("27","00"), 
+#          ReportingCategory == "TA",
+          CharterSchool =="All",
+          AlternativeSchoolAccountabilityStatus == "All",
+          CompleterType =="TA"
+) %>%
+  collect()
+
+
+```
+
+## Student Demographics - By district
+
+A look at student demographics
+
+## Performance Data from Dashboard
+
+```{r cars, echo = TRUE}
+summary(cars)
+```
+
+## College Board data - Countywide
+
+
+```{r cgr, echo = TRUE}
+
+
+cgr_all <- tbl(con, "CGR")  %>%
+  filter( AggregateLevel %in% c("T", "C"),
+          CountyCode %in% c("27"), 
+#          CountyCode %in% c("27","00"), 
+#          ReportingCategory == "TA",
+          CharterSchool =="All",
+          AlternativeSchoolAccountabilityStatus == "All",
+          CompleterType =="TA"
+) %>%
+  collect() %>%
+  mutate(Geo = if_else(AggregateLevel == "T", "California" , CountyName)) %>%
+  mutate(CGR12 = College_Going_Rate_Total_12_Months,
+         CGR12 = as.numeric(CGR12)) %>%
+    filter(ReportingCategory == "TA" | str_sub(ReportingCategory,1,1) == "R" )
+
+
+ggplot(cgr_all, aes(x = AcademicYear, y = CGR12/100, group = ReportingCategory, color = ReportingCategory , linetype = ReportingCategory, label= percent(CGR12/100, accuracy = .1)) ) +
+  geom_line(size = 1.5) +
+  geom_label(data = cgr_all %>% filter(AcademicYear == max(AcademicYear)) , size = 3, color = "black") +
+  theme_hc() +
+  #        coord_flip() +
+#  scale_color_few() +
+  scale_y_continuous(labels = percent_format(accuracy = 1), limits = c(.5,.7)) +
+#  scale_linetype_manual(values =  c("dashed", "solid")) +
+  guides(linetype = FALSE) +
+  labs(x = "",
+       y = "",
+       color ="",
+       title = ("College-Going Rate Over Time "),
+       caption = "Source: College-Going Rate for HS Completers (12-month)  https://www.cde.ca.gov/ds/sd/sd/filescgr12.asp") 
+
+
+
+
+```
+
+
+
+## College Board data - By District
+
+
+```{r pressure}
+plot(pressure)
+```
+
