@@ -2,11 +2,13 @@
 title: "Equity Summary"
 author: "David Dobrowski"
 date: "9/29/2021"
-output: powerpoint_presentation
+output:
+  beamer_presentation: default
+  powerpoint_presentation: default
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE , message=FALSE)
+knitr::opts_chunk$set(echo = FALSE , message=FALSE, warning = FALSE)
 
 library(here)
 library(rmarkdown)
@@ -24,6 +26,17 @@ options(scipen=999)
 
 con <- MCOE::mcoe_sql_con()
 
+
+
+sheet_id <- "https://docs.google.com/spreadsheets/d/1_EmvLQq-cUe8Ist_WYGJFgdjD27dajpfSbEd_djvbsc/edit#gid=0"
+
+codebook <- read_sheet(sheet_id,
+                       col_types = "ccccccD")
+
+
+
+
+
 ```
 
 ## Teacher Demographics - Countywide
@@ -38,36 +51,287 @@ A look at teacher demographics
 ## Student Demographics - Countywide
 
 A look at student demographics
-```{r enrollment, echo = TRUE}
+```{r enrollment, fig.width=9}
 
-enrollment <- tbl(con, "CGR")  %>%
-  filter( AggregateLevel %in% c("T", "C"),
-          CountyCode %in% c("27"), 
-#          CountyCode %in% c("27","00"), 
-#          ReportingCategory == "TA",
-          CharterSchool =="All",
-          AlternativeSchoolAccountabilityStatus == "All",
-          CompleterType =="TA"
-) %>%
+enrollment <- tbl(con, "ENROLLMENT")  %>%
+ #   head() %>%
+   filter( County == "Monterey",
+#           CountyCode %in% c("27"), 
+# #          CountyCode %in% c("27","00"), 
+# #          ReportingCategory == "TA",
+#           CharterSchool =="All",
+#           AlternativeSchoolAccountabilityStatus == "All",
+#           CompleterType =="TA"
+ ) %>%
   collect()
+
+codebook.enr <- codebook %>%
+    filter(table == "ENROLLMENT",
+           field_name == "ETHNIC") %>%
+    select(variable,definition)
+
+enrollment.sum <- enrollment %>%
+    filter(YEAR == max(YEAR)) %>%
+    group_by(DISTRICT, ETHNIC) %>%
+    summarise(TOTAL = sum(ENR_TOTAL)) %>%
+    mutate(ETHNIC = as.character(ETHNIC),
+           Percent = TOTAL/sum(TOTAL)) %>%
+    left_join(codebook.enr, by = c("ETHNIC" = "variable"))
+
+county.sum <- enrollment.sum %>%
+    group_by(ETHNIC) %>% 
+    summarise(GRAND.TOTAL = sum(TOTAL)) %>%
+    mutate(Percent = GRAND.TOTAL/sum(GRAND.TOTAL))%>%
+    left_join(codebook.enr, by = c("ETHNIC" = "variable"))
+
+ggplot(county.sum, aes(x = reorder(definition, GRAND.TOTAL ), y = GRAND.TOTAL, label = percent(Percent))) +
+    geom_col() +
+    coord_flip() + 
+    geom_label(
+                   size = 2,
+                   show.legend = FALSE)
 
 
 ```
 
 ## Student Demographics - By district
 
-A look at student demographics
+Number and percent of African-American students
+```{r black-demo}
+enrollment.sum %>%
+    filter(ETHNIC == 6) %>%
+    ggplot( aes(x = reorder(DISTRICT, TOTAL ), y = TOTAL, label = paste0(TOTAL,", ", percent(Percent, accuracy = 0.01) ) ))  +
+    geom_col() +
+    coord_flip() + 
+    geom_label(
+                   size = 2,
+                   show.legend = FALSE)
+
+```
+
 
 ## Performance Data from Dashboard
 
-```{r cars, echo = TRUE}
-summary(cars)
+
+
+## Suspensions
+
+```{r susp}
+
+
+susp_vroom <- tbl(con,"SUSP") %>% 
+  filter(is.na(district_code),
+          charter_yn == "All" | is.na(charter_yn) | charter_yn == "") %>%
+  collect() %>%
+  mutate(Geo = if_else(aggregate_level == "T", "California" ,county_name ))# %>%
+#  mutate_at(vars(cumulative_enrollment:suspension_count_other_reasons), funs(as.numeric) )
+
+susp_all <- susp_vroom %>%
+  filter( (aggregate_level == "T"  |county_code == 27),
+          reporting_category == "TA") 
+
+
+
+susp.acron <- tribble(
+  ~ReportingCategory, ~StudentGroup,
+  "RB", "African American",
+  "RI", "American Indian or Alaska Native",
+  "RA", "Asian",
+  "RF", "Filipino",
+  "RH", "Hispanic or Latino",
+  "RD", "Race Not Reported",
+  "RP", "Pacific Islander",
+  "RT", "Two or More Races",
+  "RW", "White",
+  "GM", "Male",
+  "GF", "Female",
+  "GX", "Non-Binary", 
+  "GZ", "Missing Gender",
+  "SE", "English Learners",
+  "SD", "Students with Disabilities",
+  "SS", "Socioeconomically Disadvantaged",
+  "SM", "Migrant",
+  "SF", "Foster",
+  "SH", "Homeless",
+  "TA", "Total")
+
+susp_sub <- susp_vroom %>%  
+  filter( 
+    (county_code == 27),
+    academic_year == max(academic_year)
+ ) %>%
+  rename(ReportingCategory = reporting_category) %>%
+  left_join(susp.acron) %>%
+  mutate(StudentGroupCategory = str_extract(ReportingCategory ,"[:alpha:]{1,1}"  )) %>%
+  mutate(StudentGroupCategory = case_when(StudentGroupCategory == "G" ~ "Gender",
+                                          StudentGroupCategory == "R" ~ "Race/Ethnicity",
+                                          StudentGroupCategory == "S" ~ "Student Group")) %>%
+  filter(ReportingCategory == "TA"| str_sub(ReportingCategory,1,1) == "R")
+  
+
+
+ggplot(susp_sub, aes( y = suspension_rate_total/100, x =fct_reorder(StudentGroup, suspension_rate_total) ,  label = percent(suspension_rate_total/100, accuracy = .1))) +
+  geom_segment( aes(x=fct_reorder(StudentGroup, suspension_rate_total), xend=fct_reorder(StudentGroup, suspension_rate_total), y=0, yend=suspension_rate_total/100),
+                color="orange",
+                size =2 ) +
+  geom_point( color="orange", size=5, alpha=0.6) +
+  facet_grid(facets = vars(StudentGroupCategory), scales = "free" ) +
+  coord_flip() +
+  geom_text(size = 3, color = "black") +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  theme_hc() +
+  mcoe_theme +
+  labs(x = "",
+       y = "",
+       color ="",
+       title = ("K-12 Suspension Rates By Subgroup"), # fn("K-12 Suspension Rates Over Time"),
+       caption = "Source: Suspension Data Files \n https://www.cde.ca.gov/ds/sd/sd/filessd.asp")
+
+
+
 ```
+
+## Math 
+
+```{r math}
+
+# Generated from the CAASPP repo
+
+sbac.all <- 
+
+sbac.all <-   read_rds(here("data","sbac-all.rds"))
+
+sbac.all.multi <-   read_rds(here("data","sbac-all-multi.rds"))
+
+sbac.filtered <- sbac.all.multi %>%
+  filter(
+         `County Code` %in% c("00", "27"),
+         `District Code` == "00000",
+         Grade == "Overall") %>%
+  select(`Subgroup ID`, `Student Group` , `Demographic Name` ,`County Code`, TestID,  starts_with("Percentage Standard Met and")) %>%
+  pivot_longer(cols = `Percentage Standard Met and Above.19`:`Percentage Standard Met and Above.17`) %>%  # Can be 15 if not including the state
+  mutate(Geo = if_else(`County Code` == "00", "California", "Monterey County"),
+         Year = gsub("^.*\\.","",name)) %>%
+  mutate(`Year` = `Year`%>% recode(`17` = "2016-17", `18` = "2017-18", `19` = "2018-19"))
+
+
+test <- "ELA"
+
+sbac.filtered %>%
+  filter(TestID == test,
+         `Subgroup ID` == 1) %>%
+ggplot( aes(x = Year, y = value/100, group = Geo, color = Geo , linetype = Geo, label=percent(value/100, digits = 0) )) +
+  geom_line(size = 1.5) +
+  geom_label(data = sbac.filtered %>%
+              filter(TestID == test,
+                     `Subgroup ID` == 1) %>%
+              filter(Year == max(Year)) , size = 3, color = "black") +
+  theme_hc() +
+  scale_color_few() +
+  scale_y_continuous(labels = percent_format(accuracy = 1), limits = c(0,.6)) +
+  scale_linetype_manual(values =  c("dashed", "solid")) +
+  guides(linetype = FALSE) +
+  labs(x = "",
+       y = "",
+       color ="",
+       title = (paste0(test, " Percentage Meeting and Exceeding Rates Over Time")),
+       caption = "Source: CAASPP Research Files \n https://caaspp-elpac.cde.ca.gov/caaspp/ResearchFileList")
+
+ggsave(here("figs","2021",paste0(test,".png")), width = 6, height = 4)
+
+
+sbac.filtered %>%
+  filter(TestID == test,
+         Year == max(Year),
+         `County Code` == "27",
+        `Subgroup ID` < 200 &`Subgroup ID` %notin% c(190,212)) %>% # `Demographic Name`
+  ggplot( aes( y = value/100, x =fct_reorder(`Demographic Name`, value) ,  label = percent(value/100, accuracy = .1))) +
+  geom_segment( aes(x=fct_reorder(`Demographic Name`, value/100), xend=fct_reorder(`Demographic Name`, value/100), y=0, yend=value/100),
+                color="orange",
+                size =2 ) +
+  geom_point( color="orange", size=5, alpha=0.6) +
+  coord_flip() +
+  geom_text(size = 3, color = "black") +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  facet_grid(facets = vars(`Student Group`), scales = "free" ) +
+  theme_hc() +
+  mcoe_theme +
+  labs(x = "",
+       y = "",
+       color ="",
+       title = (paste0(test, " Percentage Meeting and Exceeding Rates by Student Group")),
+       caption = "Source: CAASPP Research Files \n https://caaspp-elpac.cde.ca.gov/caaspp/ResearchFileList")
+
+ggsave(here("figs","2021",paste0(test,"-sub.png")), width = 8, height = 11)
+
+
+test <- "Math"
+
+sbac.filtered %>%
+  filter(TestID == test,
+         `Subgroup ID` == 1) %>%
+  ggplot( aes(x = Year, y = value/100, group = Geo, color = Geo , linetype = Geo, label=percent(value/100, digits = 0) )) +
+  geom_line(size = 1.5) +
+  geom_label(data = sbac.filtered %>%
+              filter(TestID == test,
+                     `Subgroup ID` == 1) %>%
+              filter(Year == max(Year)) , size = 3, color = "black") +
+  theme_hc() +
+  scale_color_few() +
+  scale_y_continuous(labels = percent_format(accuracy = 1), limits = c(0,.6)) +
+  scale_linetype_manual(values =  c("dashed", "solid")) +
+  guides(linetype = FALSE) +
+  labs(x = "",
+       y = "",
+       color ="",
+       title = (paste0(test, " Percentage Meeting and Exceeding Rates Over Time")),
+       caption = "Source: CAASPP Research Files \n https://caaspp-elpac.cde.ca.gov/caaspp/ResearchFileList")
+
+ggsave(here("figs","2021",paste0(test,".png")), width = 6, height = 4)
+
+
+sbac.filtered %>%
+  filter(TestID == test,
+         Year == max(Year),
+         `County Code` == "27",
+         `Subgroup ID` < 200 &`Subgroup ID` %notin% c(190,212)) %>% # `Demographic Name`
+  ggplot( aes( y = value/100, x =fct_reorder(`Demographic Name`, value) ,  label = percent(value/100, accuracy = .1))) +
+  geom_segment( aes(x=fct_reorder(`Demographic Name`, value/100), xend=fct_reorder(`Demographic Name`, value/100), y=0, yend=value/100),
+                color="orange",
+                size =2 ) +
+  geom_point( color="orange", size=5, alpha=0.6) +
+  coord_flip() +
+  geom_text(size = 3, color = "black") +
+  facet_grid(facets = vars(`Student Group`), scales = "free" ) +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  theme_hc() +
+  mcoe_theme +
+  labs(x = "",
+       y = "",
+       color ="",
+       title = (paste0(test, " Percentage Meeting and Exceeding Rates by Student Group")),
+       caption = "Source: CAASPP Research Files \n https://caaspp-elpac.cde.ca.gov/caaspp/ResearchFileList")
+
+ggsave(here("figs","2021",paste0(test,"-sub.png")), width = 8, height = 11)
+
+
+
+```
+
+##
+
+```{r ela}
+
+
+
+```
+
+
 
 ## College Board data - Countywide
 
 
-```{r cgr, echo = TRUE}
+```{r cgr}
 
 
 cgr_all <- tbl(con, "CGR")  %>%
@@ -110,8 +374,5 @@ ggplot(cgr_all, aes(x = AcademicYear, y = CGR12/100, group = ReportingCategory, 
 
 ## College Board data - By District
 
-
-```{r pressure}
-plot(pressure)
-```
+https://public.tableau.com/app/profile/tulare.county.office.of.education/viz/CaliforniaPostsecondaryDataExplorer/Menu
 
