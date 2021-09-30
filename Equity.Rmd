@@ -53,36 +53,108 @@ entit <- tbl(con, "SCHOOLS") %>%
 
 ```
 
+
+
+
+```{r staff-demo, fig.width=9}
+
+staff_demo <- tbl(con, "STAFF_DEMO")  %>%
+   filter( CountyName == "Monterey",
+           AcademicYear == "1819"
+ ) %>%
+  collect()
+
+
+staff_demo2 <- staff_demo %>%
+    mutate(EthnicGroup = as.character(EthnicGroup)) %>%
+    left_join_codebook("STAFF_DEMO", "EthnicGroup") %>%
+    group_by(DistrictName, definition) %>%
+    count() %>%
+    group_by(DistrictName) %>%
+    mutate(perc = n/sum(n)) 
+
+staff.color <- staff_demo2 %>%
+    filter( str_detect(definition, "White|Reported") ) %>%
+    transmute(perc.color = 1-sum(perc)) %>%
+    distinct()
+```
+
+
 ## Teacher Demographics - Countywide
 
-A look at teacher demographics 
+
+``` {r staff-county}
+
+staff_demo2 %>% 
+    group_by(definition) %>%
+   summarise(total =  sum(n) ) %>%
+    mutate(Percent = total/sum(total)) %>%
+
+
+
+ggplot( aes(x = reorder(definition, total ),
+            y = total,
+            label = percent(Percent, accuracy = 0.1),
+            fill = definition)) +
+    geom_col() +
+    coord_flip() + 
+    geom_label( size = 3,
+                show.legend = FALSE)+
+        mcoe_theme +
+    scale_fill_brewer(palette = "Set1") +
+        guides(fill = guide_legend(label.position = "bottom",
+                               nrow = 3,
+                               keywidth = 10,
+                               label.vjust = 10)) 
+
+
+
+
+```
 
 ## Teacher Demographics - By District
 
-A look at teacher demographics 
+
+``` {r staff-district}
+staff_demo2 %>%
+    left_join(staff.color) %>%
+ggplot( aes(x = reorder(DistrictName,perc.color) ,
+            y = n,
+            fill = definition            )
+        )+ 
+    geom_col() + 
+    geom_text(data = staff_demo2 %>%
+                  left_join(staff.color) %>%
+                  group_by(DistrictName) %>%
+                  slice(1),
+              size = 3.5,
+             # position =  position_stack(10),
+              aes (label = percent( perc.color, accuracy = 0.1),
+                   y = -50)) +
+    mcoe_theme +
+    scale_fill_brewer(palette = "Set1") +
+    coord_flip() +
+    guides(fill = guide_legend(label.position = "bottom",
+                               nrow = 3,
+                               keywidth = 10,
+                               label.vjust = 10)) +
+    labs(title = "Number of Certified Staff by District by Race/Ethnicity",
+         subtitle = "Including percent of teachers of color")
+
+```
+
 
 
 ## Student Demographics - Countywide
 
-A look at student demographics
 ```{r enrollment, fig.width=9}
 
 enrollment <- tbl(con, "ENROLLMENT")  %>%
  #   head() %>%
    filter( County == "Monterey",
-#           CountyCode %in% c("27"), 
-# #          CountyCode %in% c("27","00"), 
-# #          ReportingCategory == "TA",
-#           CharterSchool =="All",
-#           AlternativeSchoolAccountabilityStatus == "All",
-#           CompleterType =="TA"
  ) %>%
   collect()
 
-# codebook.enr <- codebook %>%
-#     filter(table == "ENROLLMENT",
-#            field_name == "ETHNIC") %>%
-#     select(variable,definition)
 
 enrollment.sum <- enrollment %>%
     filter(YEAR == max(YEAR)) %>%
@@ -98,12 +170,13 @@ county.sum <- enrollment.sum %>%
     mutate(Percent = GRAND.TOTAL/sum(GRAND.TOTAL))%>%
     left_join_codebook("ENROLLMENT", "ETHNIC" )
 
-ggplot(county.sum, aes(x = reorder(definition, GRAND.TOTAL ), y = GRAND.TOTAL, label = percent(Percent))) +
+ggplot(county.sum, aes(x = reorder(definition, GRAND.TOTAL ), y = GRAND.TOTAL, label = percent(Percent, accuracy = 0.1))) +
     geom_col() +
     coord_flip() + 
     geom_label(
                    size = 2,
-                   show.legend = FALSE)
+                   show.legend = FALSE) +
+    mcoe_theme
 
 
 ```
@@ -114,14 +187,39 @@ Number and percent of African-American students
 ```{r black-demo}
 enrollment.sum %>%
     filter(ETHNIC == 6) %>%
-    ggplot( aes(x = reorder(DISTRICT, TOTAL ), y = TOTAL, label = paste0(TOTAL,", ", percent(Percent, accuracy = 0.01) ) ))  +
-    geom_col() +
+    ggplot( aes(x = reorder(DISTRICT, TOTAL ),
+                y = TOTAL,
+                label = paste0(TOTAL,", ", percent(Percent, accuracy = 0.1) )
+                ))  +
+    geom_col(fill = "lightblue") +
     coord_flip() + 
     geom_label(
                    size = 2,
-                   show.legend = FALSE)
+                   show.legend = FALSE) +
+    mcoe_theme 
 
 ```
+
+
+## Student Demographics - By district
+
+Number and percent of Latinx students
+```{r latinx-demo}
+enrollment.sum %>%
+    filter(ETHNIC == 5) %>%
+    ggplot( aes(x = reorder(DISTRICT, TOTAL ),
+                y = TOTAL,
+                label = paste0(TOTAL,", ", percent(Percent, accuracy = 0.1) )
+                ))  +
+    geom_col(fill = "lightgreen") +
+    coord_flip() + 
+    geom_label(
+                   size = 2,
+                   show.legend = FALSE) +
+    mcoe_theme 
+
+```
+
 
 
 ## Performance Data from Dashboard
@@ -134,7 +232,7 @@ enrollment.sum %>%
 
 
 susp_vroom <- tbl(con,"SUSP") %>% 
-  filter(is.na(district_code),
+  filter(county_code == 27,
           charter_yn == "All" | is.na(charter_yn) | charter_yn == "") %>%
   collect() %>%
   mutate(Geo = if_else(aggregate_level == "T", "California" ,county_name ))# %>%
@@ -146,66 +244,114 @@ susp_all <- susp_vroom %>%
 
 
 
-susp.acron <- tribble(
-  ~ReportingCategory, ~StudentGroup,
-  "RB", "African American",
-  "RI", "American Indian or Alaska Native",
-  "RA", "Asian",
-  "RF", "Filipino",
-  "RH", "Hispanic or Latino",
-  "RD", "Race Not Reported",
-  "RP", "Pacific Islander",
-  "RT", "Two or More Races",
-  "RW", "White",
-  "GM", "Male",
-  "GF", "Female",
-  "GX", "Non-Binary", 
-  "GZ", "Missing Gender",
-  "SE", "English Learners",
-  "SD", "Students with Disabilities",
-  "SS", "Socioeconomically Disadvantaged",
-  "SM", "Migrant",
-  "SF", "Foster",
-  "SH", "Homeless",
-  "TA", "Total")
-
 susp_sub <- susp_vroom %>%  
-  filter( 
+  filter( is.na(district_code),
     (county_code == 27),
     academic_year == max(academic_year)
  ) %>%
-  rename(ReportingCategory = reporting_category) %>%
-  left_join(susp.acron) %>%
-  mutate(StudentGroupCategory = str_extract(ReportingCategory ,"[:alpha:]{1,1}"  )) %>%
-  mutate(StudentGroupCategory = case_when(StudentGroupCategory == "G" ~ "Gender",
-                                          StudentGroupCategory == "R" ~ "Race/Ethnicity",
-                                          StudentGroupCategory == "S" ~ "Student Group")) %>%
-  filter(ReportingCategory == "TA"| str_sub(ReportingCategory,1,1) == "R")
+  left_join_codebook("SUSP","reporting_category") %>%
+    rename(ReportingCategory = reporting_category)# %>%
+#  left_join(susp.acron) %>%
+  # mutate(StudentGroupCategory = str_extract(ReportingCategory ,"[:alpha:]{1,1}"  )) %>%
+  # mutate(StudentGroupCategory = case_when(StudentGroupCategory == "G" ~ "Gender",
+  #                                         StudentGroupCategory == "R" ~ "Race/Ethnicity",
+  #                                         StudentGroupCategory == "S" ~ "Student Group")) %>%
+  # filter(ReportingCategory == "TA"| str_sub(ReportingCategory,1,1) == "R")
   
 
 
-ggplot(susp_sub, aes( y = suspension_rate_total/100, x =fct_reorder(StudentGroup, suspension_rate_total) ,  label = percent(suspension_rate_total/100, accuracy = .1))) +
-  geom_segment( aes(x=fct_reorder(StudentGroup, suspension_rate_total), xend=fct_reorder(StudentGroup, suspension_rate_total), y=0, yend=suspension_rate_total/100),
+ggplot(susp_sub, aes( y = suspension_rate_total/100, x =fct_reorder(definition, suspension_rate_total) ,  label = percent(suspension_rate_total/100, accuracy = .1))) +
+  geom_segment( aes(x=fct_reorder(definition, suspension_rate_total), xend=fct_reorder(definition, suspension_rate_total), y=0, yend=suspension_rate_total/100),
                 color="orange",
                 size =2 ) +
   geom_point( color="orange", size=5, alpha=0.6) +
-  facet_grid(facets = vars(StudentGroupCategory), scales = "free" ) +
+#  facet_grid(facets = vars(StudentGroupCategory), scales = "free" ) +
   coord_flip() +
   geom_text(size = 3, color = "black") +
   scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
   theme_hc() +
   mcoe_theme +
-  labs(x = "",
-       y = "",
-       color ="",
-       title = ("K-12 Suspension Rates By Subgroup"), # fn("K-12 Suspension Rates Over Time"),
+  labs(title = ("K-12 Suspension Rates By Subgroup"), # fn("K-12 Suspension Rates Over Time"),
        caption = "Source: Suspension Data Files \n https://www.cde.ca.gov/ds/sd/sd/filessd.asp")
-
 
 
 ```
 
-## Math 
+
+## 
+
+```{r susp-district}
+
+susp_vroom %>%  
+  filter( aggregate_level %in% c("C","D"),
+    academic_year == max(academic_year),
+    reporting_category == "RB",
+    !is.na(suspension_rate_total)
+ ) %>%
+  left_join_codebook("SUSP","reporting_category") %>%
+    rename(ReportingCategory = reporting_category) %>%
+ mutate(cds = paste0(county_code,district_code,school_code)) %>%
+    left_join(entit) %>%
+    mutate(District = if_else(is.na(District),"Monterey County",District)) %>%
+
+
+ggplot( aes( y = suspension_rate_total/100, x =fct_reorder(District, suspension_rate_total) ,  label = percent(suspension_rate_total/100, accuracy = .1))) +
+  geom_segment( aes(x=fct_reorder(District, suspension_rate_total), xend=fct_reorder(District, suspension_rate_total), y=0, yend=suspension_rate_total/100),
+                color="lightblue",
+                size =2 ) +
+  geom_point( color="lightblue", size=5, alpha=0.6) +
+#  facet_grid(facets = vars(StudentGroupCategory), scales = "free" ) +
+  coord_flip() +
+  geom_text(size = 3, color = "black") +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  theme_hc() +
+  mcoe_theme +
+  labs(title = ("K-12 Suspension Rates By District for African-Americans"), # fn("K-12 Suspension Rates Over Time"),
+       caption = "Source: Suspension Data Files \n https://www.cde.ca.gov/ds/sd/sd/filessd.asp")
+
+
+```
+
+
+## 
+
+```{r susp-county}
+
+susp_vroom %>%  
+  filter( aggregate_level %in% c("C","D"),
+    academic_year == max(academic_year),
+    reporting_category == "RH",
+    !is.na(suspension_rate_total)
+ ) %>%
+  left_join_codebook("SUSP","reporting_category") %>%
+    rename(ReportingCategory = reporting_category) %>%
+ mutate(cds = paste0(county_code,district_code,school_code)) %>%
+    left_join(entit) %>%
+    mutate(District = if_else(is.na(District),"Monterey County",District)) %>%
+
+
+ggplot( aes( y = suspension_rate_total/100, x =fct_reorder(District, suspension_rate_total) ,  label = percent(suspension_rate_total/100, accuracy = .1))) +
+  geom_segment( aes(x=fct_reorder(District, suspension_rate_total), xend=fct_reorder(District, suspension_rate_total), y=0, yend=suspension_rate_total/100),
+                color="lightgreen",
+                size =2 ) +
+  geom_point( color="lightgreen", size=5, alpha=0.6) +
+#  facet_grid(facets = vars(StudentGroupCategory), scales = "free" ) +
+  coord_flip() +
+  geom_text(size = 3, color = "black") +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  theme_hc() +
+  mcoe_theme +
+  labs(title = ("K-12 Suspension Rates By District for Latinxs"), # fn("K-12 Suspension Rates Over Time"),
+       caption = "Source: Suspension Data Files \n https://www.cde.ca.gov/ds/sd/sd/filessd.asp")
+
+
+```
+
+
+
+
+
+## ELA 
 
 ```{r math}
 
@@ -264,7 +410,7 @@ caaspp_lollipop <- function(testy, district, students, df) {
         filter(!is.na(Percentage_Standard_Met_and_Above)) %>%
     lollipop(y_var = Percentage_Standard_Met_and_Above,
              x_var = case_when(district == FALSE ~ definition,
-                         district == TRUE ~ District_Code),
+                         district == TRUE ~ District),
              colorful) +
   labs(title = (paste0(test, " Percentage Meeting and Exceeding Rates ",   case_when(district == FALSE ~ "Countywide by Racial Group",
           district == TRUE & students == 74 ~ "by District for African-Americans",
@@ -316,7 +462,7 @@ caaspp_lollipop(df = codebook.caaspp,
 ```
 
 
-##
+## Math
 
 ```{r math-county}
 
@@ -363,14 +509,14 @@ caaspp_lollipop(df = codebook.caaspp,
 
 
 
-## College Board data - Countywide
+## College Going Rate - Countywide
 
 
 ```{r cgr}
 
 
 cgr_all <- tbl(con, "CGR")  %>%
-  filter( AggregateLevel %in% c("T", "C"),
+  filter( # AggregateLevel %in% c("T", "C"),
           CountyCode %in% c("27"), 
 #          CountyCode %in% c("27","00"), 
 #          ReportingCategory == "TA",
@@ -381,35 +527,20 @@ cgr_all <- tbl(con, "CGR")  %>%
   collect() %>%
   mutate(Geo = if_else(AggregateLevel == "T", "California" , CountyName)) %>%
   mutate(CGR12 = College_Going_Rate_Total_12_Months,
-         CGR12 = as.numeric(CGR12)) %>%
+         CGR12 = as.numeric(CGR12),
+         DistrictName = if_else(is.na(DistrictName),"Monterey County",DistrictName)) %>%
     filter(ReportingCategory == "TA" | str_sub(ReportingCategory,1,1) == "R" ) %>%
-    left_join_codebook("CGR","ReportingCategory")
+    left_join_codebook("CGR","ReportingCategory") 
 
 cgr_all %>% 
-    filter(AcademicYear == max(AcademicYear)) %>%
+    filter(AcademicYear == max(AcademicYear),
+           AggregateLevel %in% c("T", "C")) %>%
 lollipop(
          y_var = CGR12,
          x_var = definition,
          colorme = "orange") +
-  labs(title = ("College-Going Rate Over Time "),
-       caption = "Source: College-Going Rate for HS Completers (12-month)  https://www.cde.ca.gov/ds/sd/sd/filescgr12.asp") 
-
-
-
-# ggplot(cgr_all, aes(x = AcademicYear, y = CGR12/100, group = ReportingCategory, color = ReportingCategory , linetype = ReportingCategory, label= percent(CGR12/100, accuracy = .1)) ) +
-#   geom_line(size = 1.5) +
-#   geom_label(data = cgr_all %>% filter(AcademicYear == max(AcademicYear)) , size = 3, color = "black") +
-#   theme_hc() +
-#   #        coord_flip() +
-# #  scale_color_few() +
-#   scale_y_continuous(labels = percent_format(accuracy = 1), limits = c(.5,.7)) +
-# #  scale_linetype_manual(values =  c("dashed", "solid")) +
-#   guides(linetype = FALSE) +
-#   labs(x = "",
-#        y = "",
-#        color ="",
-#        title = ("College-Going Rate Over Time "),
-#        caption = "Source: College-Going Rate for HS Completers (12-month)  https://www.cde.ca.gov/ds/sd/sd/filescgr12.asp") 
+  labs(title = ("College-Going Rate"),
+       caption = "Source: College-Going Rate for HS Completers (12-month) \n  https://www.cde.ca.gov/ds/sd/sd/filescgr12.asp") 
 
 
 
@@ -418,7 +549,48 @@ lollipop(
 
 
 
-## College Board data - By District
+## College Going Rate - By District
+
+
+```{r cgr-black}
+
+cgr_all %>% 
+    filter(AcademicYear == max(AcademicYear),
+           AggregateLevel %in% c("C", "D"),
+           ReportingCategory == "RB",
+           !is.na(CGR12)) %>%
+lollipop(
+         y_var = CGR12,
+         x_var = DistrictName,
+         colorme = "lightblue") +
+  labs(title = ("College-Going Rate by District for African-Americans "),
+       caption = "Source: College-Going Rate for HS Completers (12-month) \n  https://www.cde.ca.gov/ds/sd/sd/filescgr12.asp") 
+
+
+```
+
+
+## College Going Rate - By District
+
+
+```{r cgr-latinx}
+
+cgr_all %>% 
+    filter(AcademicYear == max(AcademicYear),
+           AggregateLevel %in% c("C", "D"),
+           ReportingCategory == "RH",
+           !is.na(CGR12)) %>%
+lollipop(
+         y_var = CGR12,
+         x_var = DistrictName,
+         colorme = "lightgreen") +
+  labs(title = ("College-Going Rate by District for Latinxs "),
+       caption = "Source: College-Going Rate for HS Completers (12-month) \n  https://www.cde.ca.gov/ds/sd/sd/filescgr12.asp") 
+
+
+```
+
+## Interaction College Data
 
 https://public.tableau.com/app/profile/tulare.county.office.of.education/viz/CaliforniaPostsecondaryDataExplorer/Menu
 
