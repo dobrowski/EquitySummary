@@ -46,6 +46,9 @@ codebook.short <- codebook %>%
 }
 
 
+entit <- tbl(con, "SCHOOLS") %>%
+    collect() %>%
+    select(cds = CDSCode, District)
 
 
 ```
@@ -213,34 +216,21 @@ sbac.all <- tbl(con,"CAASPP") %>%
         Test_Year == "2019",
         Grade == "13",
         County_Code == 27,
+        School_Code == "0000000",
         Subgroup_ID == 1 | Subgroup_ID >70 & Subgroup_ID <81
     ) %>% 
-    head(50) %>%
+#    head(50) %>%
     collect()
 
 codebook.caaspp <- sbac.all %>%
     mutate(Subgroup_ID = as.character(Subgroup_ID)) %>%
     left_join_codebook("CAASPP","Subgroup_ID") %>%
-    mutate(Percentage_Standard_Met_and_Above = as.numeric(Percentage_Standard_Met_and_Above))
+    mutate(Percentage_Standard_Met_and_Above = as.numeric(Percentage_Standard_Met_and_Above),
+           cds = paste0(County_Code,District_Code,School_Code)) %>%
+    left_join(entit) %>%
+    mutate(District = if_else(is.na(District),"Monterey County",District))
 
-test <- "Math"
 
-  ggplot(codebook.caaspp, aes( y = Percentage_Standard_Met_and_Above/100, x =fct_reorder(definition, Percentage_Standard_Met_and_Above) ,  label = percent(Percentage_Standard_Met_and_Above/100, accuracy = .1))) +
-  geom_segment( aes(x=fct_reorder(definition, Percentage_Standard_Met_and_Above/100), xend=fct_reorder(definition, Percentage_Standard_Met_and_Above/100), y=0, yend=Percentage_Standard_Met_and_Above/100),
-                color="orange",
-                size =2 ) +
-  geom_point( color="orange", size=5, alpha=0.6) +
-  coord_flip() +
-  geom_text(size = 3, color = "black") +
-  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
-#  facet_grid(facets = vars(`Student Group`), scales = "free" ) +
-  theme_hc() +
-  mcoe_theme +
-  labs(x = "",
-       y = "",
-       color ="",
-       title = (paste0(test, " Percentage Meeting and Exceeding Rates by Student Group")),
-       caption = "Source: CAASPP Research Files \n https://caaspp-elpac.cde.ca.gov/caaspp/ResearchFileList")
 
 
 
@@ -259,134 +249,38 @@ lollipop <- function(df, y_var, x_var, colorme) {
 }
 
 
-codebook.caaspp %>%
-    filter(District_Code == "00000",
-           Test_Id == 1) %>%
-    lollipop(
-         y_var = Percentage_Standard_Met_and_Above,
-         x_var = definition,
-         colorme = "green")
+caaspp_lollipop <- function(testy, district, students, df) {
+    
+    if (testy == 2) {test <- "Math"} else {test <- "ELA"}
+    
+   colorful <- case_when(district == FALSE ~ "orange",
+          district == TRUE & students == 74 ~ "lightblue",
+          district == TRUE & students == 78 ~ "lightgreen" )
+    
+    df %>%
+        filter(Test_Id == testy) %>%
+        filter(case_when(district == FALSE ~ District_Code == "00000",
+                         district == TRUE ~ Subgroup_ID == students)) %>%
+        filter(!is.na(Percentage_Standard_Met_and_Above)) %>%
+    lollipop(y_var = Percentage_Standard_Met_and_Above,
+             x_var = case_when(district == FALSE ~ definition,
+                         district == TRUE ~ District_Code),
+             colorful) +
+  labs(title = (paste0(test, " Percentage Meeting and Exceeding Rates ",   case_when(district == FALSE ~ "Countywide by Racial Group",
+          district == TRUE & students == 74 ~ "by District for African-Americans",
+          district == TRUE & students == 78 ~ "by District for Latinxs" )
+                       )),
+       caption = "Source: CAASPP 2019 Research Files \n https://caaspp-elpac.cde.ca.gov/caaspp/ResearchFileList")
+    
+}
+
+caaspp_lollipop(df = codebook.caaspp,
+                students = 74,
+                testy = 1,
+                district = FALSE
+)
 
 
-
-
-
-
-
-
-
-
-
-sbac.filtered <- sbac.all.multi %>%
-  filter(
-         `County Code` %in% c("00", "27"),
-         `District Code` == "00000",
-         Grade == "Overall") %>%
-  select(`Subgroup ID`, `Student Group` , `Demographic Name` ,`County Code`, TestID,  starts_with("Percentage Standard Met and")) %>%
-  pivot_longer(cols = `Percentage Standard Met and Above.19`:`Percentage Standard Met and Above.17`) %>%  # Can be 15 if not including the state
-  mutate(Geo = if_else(`County Code` == "00", "California", "Monterey County"),
-         Year = gsub("^.*\\.","",name)) %>%
-  mutate(`Year` = `Year`%>% recode(`17` = "2016-17", `18` = "2017-18", `19` = "2018-19"))
-
-
-test <- "ELA"
-
-sbac.filtered %>%
-  filter(TestID == test,
-         `Subgroup ID` == 1) %>%
-ggplot( aes(x = Year, y = value/100, group = Geo, color = Geo , linetype = Geo, label=percent(value/100, digits = 0) )) +
-  geom_line(size = 1.5) +
-  geom_label(data = sbac.filtered %>%
-              filter(TestID == test,
-                     `Subgroup ID` == 1) %>%
-              filter(Year == max(Year)) , size = 3, color = "black") +
-  theme_hc() +
-  scale_color_few() +
-  scale_y_continuous(labels = percent_format(accuracy = 1), limits = c(0,.6)) +
-  scale_linetype_manual(values =  c("dashed", "solid")) +
-  guides(linetype = FALSE) +
-  labs(x = "",
-       y = "",
-       color ="",
-       title = (paste0(test, " Percentage Meeting and Exceeding Rates Over Time")),
-       caption = "Source: CAASPP Research Files \n https://caaspp-elpac.cde.ca.gov/caaspp/ResearchFileList")
-
-
-
-
-sbac.filtered %>%
-  filter(TestID == test,
-         Year == max(Year),
-         `County Code` == "27",
-        `Subgroup ID` < 200 &`Subgroup ID` %notin% c(190,212)) %>% # `Demographic Name`
-  ggplot( aes( y = value/100, x =fct_reorder(`Demographic Name`, value) ,  label = percent(value/100, accuracy = .1))) +
-  geom_segment( aes(x=fct_reorder(`Demographic Name`, value/100), xend=fct_reorder(`Demographic Name`, value/100), y=0, yend=value/100),
-                color="orange",
-                size =2 ) +
-  geom_point( color="orange", size=5, alpha=0.6) +
-  coord_flip() +
-  geom_text(size = 3, color = "black") +
-  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
-  facet_grid(facets = vars(`Student Group`), scales = "free" ) +
-  theme_hc() +
-  mcoe_theme +
-  labs(x = "",
-       y = "",
-       color ="",
-       title = (paste0(test, " Percentage Meeting and Exceeding Rates by Student Group")),
-       caption = "Source: CAASPP Research Files \n https://caaspp-elpac.cde.ca.gov/caaspp/ResearchFileList")
-
-ggsave(here("figs","2021",paste0(test,"-sub.png")), width = 8, height = 11)
-
-
-test <- "Math"
-
-sbac.filtered %>%
-  filter(TestID == test,
-         `Subgroup ID` == 1) %>%
-  ggplot( aes(x = Year, y = value/100, group = Geo, color = Geo , linetype = Geo, label=percent(value/100, digits = 0) )) +
-  geom_line(size = 1.5) +
-  geom_label(data = sbac.filtered %>%
-              filter(TestID == test,
-                     `Subgroup ID` == 1) %>%
-              filter(Year == max(Year)) , size = 3, color = "black") +
-  theme_hc() +
-  scale_color_few() +
-  scale_y_continuous(labels = percent_format(accuracy = 1), limits = c(0,.6)) +
-  scale_linetype_manual(values =  c("dashed", "solid")) +
-  guides(linetype = FALSE) +
-  labs(x = "",
-       y = "",
-       color ="",
-       title = (paste0(test, " Percentage Meeting and Exceeding Rates Over Time")),
-       caption = "Source: CAASPP Research Files \n https://caaspp-elpac.cde.ca.gov/caaspp/ResearchFileList")
-
-ggsave(here("figs","2021",paste0(test,".png")), width = 6, height = 4)
-
-
-sbac.filtered %>%
-  filter(TestID == test,
-         Year == max(Year),
-         `County Code` == "27",
-         `Subgroup ID` < 200 &`Subgroup ID` %notin% c(190,212)) %>% # `Demographic Name`
-  ggplot( aes( y = value/100, x =fct_reorder(`Demographic Name`, value) ,  label = percent(value/100, accuracy = .1))) +
-  geom_segment( aes(x=fct_reorder(`Demographic Name`, value/100), xend=fct_reorder(`Demographic Name`, value/100), y=0, yend=value/100),
-                color="orange",
-                size =2 ) +
-  geom_point( color="orange", size=5, alpha=0.6) +
-  coord_flip() +
-  geom_text(size = 3, color = "black") +
-  facet_grid(facets = vars(`Student Group`), scales = "free" ) +
-  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
-  theme_hc() +
-  mcoe_theme +
-  labs(x = "",
-       y = "",
-       color ="",
-       title = (paste0(test, " Percentage Meeting and Exceeding Rates by Student Group")),
-       caption = "Source: CAASPP Research Files \n https://caaspp-elpac.cde.ca.gov/caaspp/ResearchFileList")
-
-ggsave(here("figs","2021",paste0(test,"-sub.png")), width = 8, height = 11)
 
 
 
@@ -394,11 +288,78 @@ ggsave(here("figs","2021",paste0(test,"-sub.png")), width = 8, height = 11)
 
 ##
 
-```{r ela}
+```{r ela-latinx}
+
+caaspp_lollipop(df = codebook.caaspp,
+                students = 74,
+                testy = 1,
+                district = TRUE
+)
 
 
 
 ```
+
+
+##
+
+```{r ela-black}
+
+caaspp_lollipop(df = codebook.caaspp,
+                students = 78,
+                testy = 1,
+                district = TRUE
+)
+
+
+
+```
+
+
+##
+
+```{r math-county}
+
+caaspp_lollipop(df = codebook.caaspp,
+                students = 74,
+                testy = 2,
+                district = FALSE
+)
+
+
+
+```
+
+
+##
+
+```{r math-latinx}
+
+caaspp_lollipop(df = codebook.caaspp,
+                students = 74,
+                testy = 2,
+                district = TRUE
+)
+
+
+
+```
+
+
+##
+
+```{r math-black}
+
+caaspp_lollipop(df = codebook.caaspp,
+                students = 78,
+                testy = 2,
+                district = TRUE
+)
+
+
+
+```
+
 
 
 
@@ -421,23 +382,34 @@ cgr_all <- tbl(con, "CGR")  %>%
   mutate(Geo = if_else(AggregateLevel == "T", "California" , CountyName)) %>%
   mutate(CGR12 = College_Going_Rate_Total_12_Months,
          CGR12 = as.numeric(CGR12)) %>%
-    filter(ReportingCategory == "TA" | str_sub(ReportingCategory,1,1) == "R" )
+    filter(ReportingCategory == "TA" | str_sub(ReportingCategory,1,1) == "R" ) %>%
+    left_join_codebook("CGR","ReportingCategory")
 
-
-ggplot(cgr_all, aes(x = AcademicYear, y = CGR12/100, group = ReportingCategory, color = ReportingCategory , linetype = ReportingCategory, label= percent(CGR12/100, accuracy = .1)) ) +
-  geom_line(size = 1.5) +
-  geom_label(data = cgr_all %>% filter(AcademicYear == max(AcademicYear)) , size = 3, color = "black") +
-  theme_hc() +
-  #        coord_flip() +
-#  scale_color_few() +
-  scale_y_continuous(labels = percent_format(accuracy = 1), limits = c(.5,.7)) +
-#  scale_linetype_manual(values =  c("dashed", "solid")) +
-  guides(linetype = FALSE) +
-  labs(x = "",
-       y = "",
-       color ="",
-       title = ("College-Going Rate Over Time "),
+cgr_all %>% 
+    filter(AcademicYear == max(AcademicYear)) %>%
+lollipop(
+         y_var = CGR12,
+         x_var = definition,
+         colorme = "orange") +
+  labs(title = ("College-Going Rate Over Time "),
        caption = "Source: College-Going Rate for HS Completers (12-month)  https://www.cde.ca.gov/ds/sd/sd/filescgr12.asp") 
+
+
+
+# ggplot(cgr_all, aes(x = AcademicYear, y = CGR12/100, group = ReportingCategory, color = ReportingCategory , linetype = ReportingCategory, label= percent(CGR12/100, accuracy = .1)) ) +
+#   geom_line(size = 1.5) +
+#   geom_label(data = cgr_all %>% filter(AcademicYear == max(AcademicYear)) , size = 3, color = "black") +
+#   theme_hc() +
+#   #        coord_flip() +
+# #  scale_color_few() +
+#   scale_y_continuous(labels = percent_format(accuracy = 1), limits = c(.5,.7)) +
+# #  scale_linetype_manual(values =  c("dashed", "solid")) +
+#   guides(linetype = FALSE) +
+#   labs(x = "",
+#        y = "",
+#        color ="",
+#        title = ("College-Going Rate Over Time "),
+#        caption = "Source: College-Going Rate for HS Completers (12-month)  https://www.cde.ca.gov/ds/sd/sd/filescgr12.asp") 
 
 
 
