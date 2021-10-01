@@ -80,7 +80,7 @@ staff.color <- staff_demo2 %>%
 ```
 
 
-## Teacher Demographics - Countywide
+## Certified Staff Demographics - Countywide
 
 
 ``` {r staff-county}
@@ -98,21 +98,22 @@ ggplot( aes(x = reorder(definition, total ),
             fill = definition)) +
     geom_col() +
     coord_flip() + 
-    geom_label( size = 3,
-                show.legend = FALSE)+
+    geom_text( size = 3,show.legend = FALSE)+
         mcoe_theme +
-    scale_fill_brewer(palette = "Set1") +
-        guides(fill = guide_legend(label.position = "bottom",
-                               nrow = 3,
-                               keywidth = 10,
-                               label.vjust = 10)) 
+    scale_fill_brewer(palette = "Paired") +
+    theme(legend.position = "none") +
+        # guides(fill = guide_legend(label.position = "bottom",
+        #                        nrow = 3,
+        #                        keywidth = 10,
+        #                        label.vjust = 10)) +
+    labs(caption = "Source: Staff Demographic 2018-19 Data Files\nhttps://www.cde.ca.gov/ds/ad/staffdemo.asp")
 
 
 
 
 ```
 
-## Teacher Demographics - By District
+## Certified Staff Demographics - By District
 
 
 ``` {r staff-district}
@@ -132,14 +133,16 @@ ggplot( aes(x = reorder(DistrictName,perc.color) ,
               aes (label = percent( perc.color, accuracy = 0.1),
                    y = -50)) +
     mcoe_theme +
-    scale_fill_brewer(palette = "Set1") +
+    scale_fill_brewer(palette = "Paired") +
     coord_flip() +
     guides(fill = guide_legend(label.position = "bottom",
                                nrow = 3,
-                               keywidth = 10,
+                               keywidth = 3,
                                label.vjust = 10)) +
-    labs(title = "Number of Certified Staff by District by Race/Ethnicity",
-         subtitle = "Including percent of teachers of color")
+    labs(#title = "Number of Certified Staff by District by Race/Ethnicity",
+         subtitle = "Including percent of teachers of color" ,
+         caption = "Source: Staff Demographic 2018-19 Data Files\n https://www.cde.ca.gov/ds/ad/staffdemo.asp")
+
 
 ```
 
@@ -170,13 +173,22 @@ county.sum <- enrollment.sum %>%
     mutate(Percent = GRAND.TOTAL/sum(GRAND.TOTAL))%>%
     left_join_codebook("ENROLLMENT", "ETHNIC" )
 
-ggplot(county.sum, aes(x = reorder(definition, GRAND.TOTAL ), y = GRAND.TOTAL, label = percent(Percent, accuracy = 0.1))) +
+ggplot(county.sum, aes(x = reorder(definition, GRAND.TOTAL ),
+                       y = GRAND.TOTAL,
+                       label = percent(Percent, accuracy = 0.1),
+                       fill = definition 
+                       )) +
     geom_col() +
-    coord_flip() + 
-    geom_label(
-                   size = 2,
-                   show.legend = FALSE) +
-    mcoe_theme
+    mcoe_theme +
+        scale_fill_brewer(palette = "Paired") +
+coord_flip() + 
+    geom_text(size = 3, show.legend = FALSE) +
+        guides(fill = guide_legend(label.position = "bottom",
+                               nrow = 3,
+                               keywidth = 10,
+                               label.vjust = 10)) +
+    labs(caption = "Source: Census Day Enrollment 2020-21 Data Files\nhttps://www.cde.ca.gov/ds/ad/filesenr.asp")
+    
 
 
 ```
@@ -189,14 +201,13 @@ enrollment.sum %>%
     filter(ETHNIC == 6) %>%
     ggplot( aes(x = reorder(DISTRICT, TOTAL ),
                 y = TOTAL,
-                label = paste0(TOTAL,", ", percent(Percent, accuracy = 0.1) )
+                label = paste0(TOTAL," -- ", percent(Percent, accuracy = 0.1) )
                 ))  +
     geom_col(fill = "lightblue") +
     coord_flip() + 
-    geom_label(
-                   size = 2,
-                   show.legend = FALSE) +
-    mcoe_theme 
+    geom_text(size = 3, show.legend = FALSE, y = 100) +
+    mcoe_theme +    labs(caption = "Source: Census Day Enrollment 2020-21 Data Files\nhttps://www.cde.ca.gov/ds/ad/filesenr.asp")
+
 
 ```
 
@@ -209,21 +220,16 @@ enrollment.sum %>%
     filter(ETHNIC == 5) %>%
     ggplot( aes(x = reorder(DISTRICT, TOTAL ),
                 y = TOTAL,
-                label = paste0(TOTAL,", ", percent(Percent, accuracy = 0.1) )
+                label = paste0(comma(TOTAL)," -- ", percent(Percent, accuracy = 0.1) )
                 ))  +
     geom_col(fill = "lightgreen") +
     coord_flip() + 
-    geom_label(
-                   size = 2,
-                   show.legend = FALSE) +
-    mcoe_theme 
+    geom_text(size = 3, show.legend = FALSE, y = 4000) +
+    mcoe_theme +    
+    labs(caption = "Source: Census Day Enrollment 2020-21 Data Files\nhttps://www.cde.ca.gov/ds/ad/filesenr.asp")
+
 
 ```
-
-
-
-## Performance Data from Dashboard
-
 
 
 ## Suspensions
@@ -247,7 +253,9 @@ susp_all <- susp_vroom %>%
 susp_sub <- susp_vroom %>%  
   filter( is.na(district_code),
     (county_code == 27),
-    academic_year == max(academic_year)
+    academic_year == max(academic_year),
+    !is.na(suspension_rate_total),
+    str_sub(reporting_category,1,1) == "R"
  ) %>%
   left_join_codebook("SUSP","reporting_category") %>%
     rename(ReportingCategory = reporting_category)# %>%
@@ -271,8 +279,8 @@ ggplot(susp_sub, aes( y = suspension_rate_total/100, x =fct_reorder(definition, 
   scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
   theme_hc() +
   mcoe_theme +
-  labs(title = ("K-12 Suspension Rates By Subgroup"), # fn("K-12 Suspension Rates Over Time"),
-       caption = "Source: Suspension Data Files \n https://www.cde.ca.gov/ds/sd/sd/filessd.asp")
+  labs(title = ("Monterey County Suspension Rates By Racial Group"), # fn("K-12 Suspension Rates Over Time"),
+       caption = "Source: Suspension 2019-20 Data Files \n https://www.cde.ca.gov/ds/sd/sd/filessd.asp")
 
 
 ```
@@ -306,8 +314,7 @@ ggplot( aes( y = suspension_rate_total/100, x =fct_reorder(District, suspension_
   scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
   theme_hc() +
   mcoe_theme +
-  labs(title = ("K-12 Suspension Rates By District for African-Americans"), # fn("K-12 Suspension Rates Over Time"),
-       caption = "Source: Suspension Data Files \n https://www.cde.ca.gov/ds/sd/sd/filessd.asp")
+  labs(title = ("K-12 Suspension Rates By District for African-Americans"),         caption = "Source: Suspension 2019-20 Data Files \n https://www.cde.ca.gov/ds/sd/sd/filessd.asp")
 
 
 ```
@@ -342,7 +349,7 @@ ggplot( aes( y = suspension_rate_total/100, x =fct_reorder(District, suspension_
   theme_hc() +
   mcoe_theme +
   labs(title = ("K-12 Suspension Rates By District for Latinxs"), # fn("K-12 Suspension Rates Over Time"),
-       caption = "Source: Suspension Data Files \n https://www.cde.ca.gov/ds/sd/sd/filessd.asp")
+       caption = "Source: Suspension 2019-20 Data Files \n https://www.cde.ca.gov/ds/sd/sd/filessd.asp")
 
 
 ```
@@ -351,7 +358,7 @@ ggplot( aes( y = suspension_rate_total/100, x =fct_reorder(District, suspension_
 
 
 
-## ELA 
+## CAASPP ELA Testing
 
 ```{r math}
 
@@ -412,9 +419,9 @@ caaspp_lollipop <- function(testy, district, students, df) {
              x_var = case_when(district == FALSE ~ definition,
                          district == TRUE ~ District),
              colorful) +
-  labs(title = (paste0(test, " Percentage Meeting and Exceeding Rates ",   case_when(district == FALSE ~ "Countywide by Racial Group",
-          district == TRUE & students == 74 ~ "by District for African-Americans",
-          district == TRUE & students == 78 ~ "by District for Latinxs" )
+  labs(title = (paste0("Percentage Meeting and Exceeding Standards for ",test,   case_when(district == FALSE ~ " Countywide by Racial Group",
+          district == TRUE & students == 74 ~ " by District for African-Americans",
+          district == TRUE & students == 78 ~ " by District for Latinxs" )
                        )),
        caption = "Source: CAASPP 2019 Research Files \n https://caaspp-elpac.cde.ca.gov/caaspp/ResearchFileList")
     
@@ -462,7 +469,7 @@ caaspp_lollipop(df = codebook.caaspp,
 ```
 
 
-## Math
+## CAASPP Math Testing
 
 ```{r math-county}
 
@@ -507,9 +514,65 @@ caaspp_lollipop(df = codebook.caaspp,
 ```
 
 
+## Graduates who are Prepared for College / Career  
+
+```{r cci}
 
 
-## College Going Rate - Countywide
+cci <- tbl(con, "DASH_CCI") %>%
+    filter(rtype == "D",
+           reportingyear == "2020",
+           countyname == "Monterey") %>%
+#    head() %>%
+    collect() %>%
+    filter( studentgroup %in% c("AA", "AI","ALL", "AS","HI", "FI", "MR","PI","WH")) %>%
+    left_join_codebook("DASH_CCI","studentgroup")
+            
+cci_county <- cci %>%
+    group_by(studentgroup) %>%
+    summarise(denom = sum(currdenom, na.rm = TRUE), num = sum(curr_prep, na.rm = TRUE)) %>%
+    mutate(perc = 100*num/denom) %>%
+    left_join_codebook("DASH_CCI","studentgroup")
+
+cci_county %>%
+    lollipop(y_var = perc,
+             x_var = definition,
+             colorme = "orange") +
+    labs(caption = "Source: CA Dashboard Additional Reports 2020 College-Career Data Files\nhttps://www.cde.ca.gov/ta/ac/cm/datafiles2020.asp")
+
+```
+
+## African American Graduates who are Prepared for College / Career by District 
+
+```{r cci-black} 
+
+cci %>%
+    filter(studentgroup == "AA",
+           !is.na(curr_prep_pct)) %>%
+    lollipop(y_var = curr_prep_pct,
+             x_var = districtname,
+             colorme = "lightblue") +
+    labs(caption = "Source: CA Dashboard Additional Reports 2020 College-Career Data Files\nhttps://www.cde.ca.gov/ta/ac/cm/datafiles2020.asp")
+
+
+```
+
+## Latinx Graduates who are Prepared for College / Career by District 
+
+```{r cci-latinx}            
+cci %>%
+    filter(studentgroup == "HI",
+           !is.na(curr_prep_pct)) %>%
+    lollipop(y_var = curr_prep_pct,
+             x_var = districtname,
+             colorme = "lightgreen") +
+    labs(caption = "Source: CA Dashboard Additional Reports 2020 College-Career Data Files\nhttps://www.cde.ca.gov/ta/ac/cm/datafiles2020.asp")
+
+
+```
+
+
+## College Going Rate - Countywide by Racial Group
 
 
 ```{r cgr}
@@ -539,8 +602,8 @@ lollipop(
          y_var = CGR12,
          x_var = definition,
          colorme = "orange") +
-  labs(title = ("College-Going Rate"),
-       caption = "Source: College-Going Rate for HS Completers (12-month) \n  https://www.cde.ca.gov/ds/sd/sd/filescgr12.asp") 
+  labs(title =# ("College-Going Rate"),
+       caption = "Source: College-Going Rate for 2017-18 HS Completers (12-month) \n  https://www.cde.ca.gov/ds/ad/pse.asp") 
 
 
 
@@ -564,7 +627,7 @@ lollipop(
          x_var = DistrictName,
          colorme = "lightblue") +
   labs(title = ("College-Going Rate by District for African-Americans "),
-       caption = "Source: College-Going Rate for HS Completers (12-month) \n  https://www.cde.ca.gov/ds/sd/sd/filescgr12.asp") 
+       caption = "Source: College-Going Rate for 2017-18 HS Completers (12-month) \n  https://www.cde.ca.gov/ds/ad/pse.asp") 
 
 
 ```
@@ -585,7 +648,7 @@ lollipop(
          x_var = DistrictName,
          colorme = "lightgreen") +
   labs(title = ("College-Going Rate by District for Latinxs "),
-       caption = "Source: College-Going Rate for HS Completers (12-month) \n  https://www.cde.ca.gov/ds/sd/sd/filescgr12.asp") 
+       caption = "Source: College-Going Rate for 2017-18 HS Completers (12-month) \n  https://www.cde.ca.gov/ds/ad/pse.asp") 
 
 
 ```
