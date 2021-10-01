@@ -1,9 +1,11 @@
 ---
-title: "Equity Summary"
-author: "David Dobrowski"
+title: "Equity Review in regards to African-American and Latinx Students"
+author: "MCOE"
 date: "9/29/2021"
 output:
   beamer_presentation: default
+  slidy_presentation: default
+  ioslides_presentation: default
   powerpoint_presentation: default
 ---
 
@@ -83,7 +85,7 @@ staff.color <- staff_demo2 %>%
 ## Certified Staff Demographics - Countywide
 
 
-``` {r staff-county}
+``` {r staff-county, fig.width=9}
 
 staff_demo2 %>% 
     group_by(definition) %>%
@@ -116,7 +118,7 @@ ggplot( aes(x = reorder(definition, total ),
 ## Certified Staff Demographics - By District
 
 
-``` {r staff-district}
+``` {r staff-district , fig.width=9}
 staff_demo2 %>%
     left_join(staff.color) %>%
 ggplot( aes(x = reorder(DistrictName,perc.color) ,
@@ -138,7 +140,8 @@ ggplot( aes(x = reorder(DistrictName,perc.color) ,
     guides(fill = guide_legend(label.position = "bottom",
                                nrow = 3,
                                keywidth = 3,
-                               label.vjust = 10)) +
+                               label.vjust = 10
+                               )) +
     labs(#title = "Number of Certified Staff by District by Race/Ethnicity",
          subtitle = "Including percent of teachers of color" ,
          caption = "Source: Staff Demographic 2018-19 Data Files\n https://www.cde.ca.gov/ds/ad/staffdemo.asp")
@@ -220,7 +223,7 @@ enrollment.sum %>%
     filter(ETHNIC == 5) %>%
     ggplot( aes(x = reorder(DISTRICT, TOTAL ),
                 y = TOTAL,
-                label = paste0(comma(TOTAL)," -- ", percent(Percent, accuracy = 0.1) )
+                label = paste0(comma(TOTAL, accuracy = 1)," -- ", percent(Percent, accuracy = 0.1) )
                 ))  +
     geom_col(fill = "lightgreen") +
     coord_flip() + 
@@ -602,7 +605,7 @@ lollipop(
          y_var = CGR12,
          x_var = definition,
          colorme = "orange") +
-  labs(title =# ("College-Going Rate"),
+  labs(#title = ("College-Going Rate"),
        caption = "Source: College-Going Rate for 2017-18 HS Completers (12-month) \n  https://www.cde.ca.gov/ds/ad/pse.asp") 
 
 
