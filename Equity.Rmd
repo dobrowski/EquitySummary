@@ -1,7 +1,7 @@
 ---
 title: "Equity Review in regards to African-American and Latinx Students"
 author: "MCOE"
-date: "9/29/2021"
+date: "Compiled on `r format(Sys.Date(), '%B %d, %Y ' )`"
 output:
   beamer_presentation: default
   slidy_presentation: default
@@ -22,6 +22,7 @@ library(MCOE)
 library(ggthemes)
 library(googlesheets4)
 library(scales)
+library(ggtext)
 
 options(scipen=999)
 
@@ -51,6 +52,24 @@ codebook.short <- codebook %>%
 entit <- tbl(con, "SCHOOLS") %>%
     collect() %>%
     select(cds = CDSCode, District)
+
+
+
+lollipop <- function(df, y_var, x_var, colorme) {
+  ggplot(df, aes( y = {{y_var}}/100, x =fct_reorder({{x_var}}, {{y_var}}) ,  label = percent({{y_var}}/100, accuracy = .1))) +
+  geom_segment( aes(x=fct_reorder({{x_var}}, {{y_var}}/100), xend=fct_reorder({{x_var}}, {{y_var}}/100), y=0, yend={{y_var}}/100),
+                color=colorme,
+                size =2 ) +
+  geom_point( color=colorme, size=5, alpha=0.6) +
+  coord_flip() +
+  geom_text(size = 3, color = "black") +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+#  facet_grid(facets = vars(`Student Group`), scales = "free" ) +
+  theme_hc() +
+  mcoe_theme
+}
+
+
 
 
 ```
@@ -108,12 +127,17 @@ ggplot( aes(x = reorder(definition, total ),
         #                        nrow = 3,
         #                        keywidth = 10,
         #                        label.vjust = 10)) +
-    labs(caption = "Source: Staff Demographic 2018-19 Data Files\nhttps://www.cde.ca.gov/ds/ad/staffdemo.asp")
+    labs(caption = "Source: Staff Demographic 2018-19 Data Files\nhttps://www.cde.ca.gov/ds/ad/staffdemo.asp") +
+  geom_textbox(x = 3, y = 1500, fill = "lightgrey",
+               label = "The majority of certified staff in Monterey County are White.  A quarter of certified staff are Latino and less then two percent are African American.")
 
 
 
 
 ```
+
+The majority of certified staff in Monterey County are White.  A quarter of certified staff are Latino and less then two percent are African American. 
+
 
 ## Certified Staff Demographics - By District
 
@@ -143,8 +167,10 @@ ggplot( aes(x = reorder(DistrictName,perc.color) ,
                                label.vjust = 10
                                )) +
     labs(#title = "Number of Certified Staff by District by Race/Ethnicity",
-         subtitle = "Including percent of teachers of color" ,
-         caption = "Source: Staff Demographic 2018-19 Data Files\n https://www.cde.ca.gov/ds/ad/staffdemo.asp")
+         subtitle = "Sorted by percent of teachers of color" ,
+         caption = "Source: Staff Demographic 2018-19 Data Files\n https://www.cde.ca.gov/ds/ad/staffdemo.asp") +
+  geom_textbox(x = 20, y = 700, fill = "lightgrey",
+               label = "The percent of teachers of color varies from three quarters to none of the certified staff.")
 
 
 ```
@@ -190,7 +216,9 @@ coord_flip() +
                                nrow = 3,
                                keywidth = 10,
                                label.vjust = 10)) +
-    labs(caption = "Source: Census Day Enrollment 2020-21 Data Files\nhttps://www.cde.ca.gov/ds/ad/filesenr.asp")
+    labs(caption = "Source: Census Day Enrollment 2020-21 Data Files\nhttps://www.cde.ca.gov/ds/ad/filesenr.asp") +
+  geom_textbox(x = 5, y = 50000, fill = "lightgrey",
+               label = "In contrast to the certified staff, the large majority of students are Hispanic or Latino. Latinxs represent four out of five students in Monterey County. Less than two percent of students are African-American.")
     
 
 
@@ -209,7 +237,9 @@ enrollment.sum %>%
     geom_col(fill = "lightblue") +
     coord_flip() + 
     geom_text(size = 3, show.legend = FALSE, y = 100) +
-    mcoe_theme +    labs(caption = "Source: Census Day Enrollment 2020-21 Data Files\nhttps://www.cde.ca.gov/ds/ad/filesenr.asp")
+    mcoe_theme +    labs(caption = "Source: Census Day Enrollment 2020-21 Data Files\nhttps://www.cde.ca.gov/ds/ad/filesenr.asp") +
+  geom_textbox(x = 8, y = 400, fill = "lightgrey",
+               label = "MPUSD and SUHSD have the most African-American students.  While in MPUSD, PGUSD and Bradley, African-Americans represent the largest percentage of the student body relatively.")
 
 
 ```
@@ -229,11 +259,74 @@ enrollment.sum %>%
     coord_flip() + 
     geom_text(size = 3, show.legend = FALSE, y = 4000) +
     mcoe_theme +    
-    labs(caption = "Source: Census Day Enrollment 2020-21 Data Files\nhttps://www.cde.ca.gov/ds/ad/filesenr.asp")
+    labs(caption = "Source: Census Day Enrollment 2020-21 Data Files\nhttps://www.cde.ca.gov/ds/ad/filesenr.asp") +
+  geom_textbox(x = 9, y = 10000, fill = "lightgrey",
+               label = "SUHSD, SCESD and AUSD have the most Latinx students.  In more than half of the districts Latinx students represent more than 89 percent of the student body.")
 
 
 ```
 
+## Student Demographics - Alternative Schools 
+
+``` {r alt-schools}
+
+not.report <- tibble("ETHNIC" = "8",
+                 "GRAND.TOTAL" = 0,
+                 "Percent" = 0,
+                 "definition" = "Not Reported")
+
+
+alt.schools <- tbl(con, "SCHOOLS") %>%
+  filter(County == "Monterey",
+         StatusType == "Active") %>%
+    collect() %>%
+  filter(EdOpsCode %in% c("ALTSOC","COMM","COMMDAY","CON"))
+
+enroll.alt <- enrollment %>%
+  filter(CDS_CODE %in% alt.schools$CDSCode) %>%
+    filter(YEAR == max(YEAR)) %>%
+    group_by(DISTRICT, ETHNIC) %>%
+    summarise(TOTAL = sum(ENR_TOTAL)) %>%
+    mutate(ETHNIC = as.character(ETHNIC),
+           Percent = TOTAL/sum(TOTAL)) %>%
+    left_join_codebook("ENROLLMENT", "ETHNIC" )
+
+county.sum.alt <- enroll.alt %>%
+    group_by(ETHNIC) %>% 
+    summarise(GRAND.TOTAL = sum(TOTAL)) %>%
+    mutate(Percent = GRAND.TOTAL/sum(GRAND.TOTAL))%>%
+    left_join_codebook("ENROLLMENT", "ETHNIC" ) %>%
+  bind_rows(not.report)
+
+
+
+ggplot(county.sum.alt, aes(x = reorder(definition, GRAND.TOTAL ),
+                       y = GRAND.TOTAL,
+                       label = percent(Percent, accuracy = 0.1),
+                       fill = definition 
+                       )) +
+    geom_col() +
+    mcoe_theme +
+        scale_fill_brewer(palette = "Paired") +
+coord_flip() + 
+    geom_text(size = 3, show.legend = FALSE) +
+        guides(fill = guide_legend(label.position = "bottom",
+                               nrow = 3,
+                               keywidth = 10,
+                               label.vjust = 10)) +
+    labs(caption = "Source: Census Day Enrollment 2020-21 Data Files\nhttps://www.cde.ca.gov/ds/ad/filesenr.asp") +
+  geom_textbox(x = 5, y = 500, fill = "lightgrey",
+               label = "Students are enrolled in Alternative Schools of Choice, Community Day Schools, County Community Schools, and Continuation Schools at very similar percentages as the overall student body.")
+    
+
+```
+
+## Notes on Data
+
+- All figures have a citation in the bottom right with the url to the public data source provided by California Department of Education where the data is found as well as identifying what year the data represents. 
+- The most recent publicly available data is used. 
+- Different data sources identify racial groups differently.  The axis labels use the terms used in that data source.  
+- Graphs with a vertical list of numbers represent the size of the total group from which the percentage for that bar is derived.  
 
 ## Suspensions
 
@@ -262,13 +355,7 @@ susp_sub <- susp_vroom %>%
  ) %>%
   left_join_codebook("SUSP","reporting_category") %>%
     rename(ReportingCategory = reporting_category)# %>%
-#  left_join(susp.acron) %>%
-  # mutate(StudentGroupCategory = str_extract(ReportingCategory ,"[:alpha:]{1,1}"  )) %>%
-  # mutate(StudentGroupCategory = case_when(StudentGroupCategory == "G" ~ "Gender",
-  #                                         StudentGroupCategory == "R" ~ "Race/Ethnicity",
-  #                                         StudentGroupCategory == "S" ~ "Student Group")) %>%
-  # filter(ReportingCategory == "TA"| str_sub(ReportingCategory,1,1) == "R")
-  
+
 
 
 ggplot(susp_sub, aes( y = suspension_rate_total/100, x =fct_reorder(definition, suspension_rate_total) ,  label = percent(suspension_rate_total/100, accuracy = .1))) +
@@ -282,8 +369,15 @@ ggplot(susp_sub, aes( y = suspension_rate_total/100, x =fct_reorder(definition, 
   scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
   theme_hc() +
   mcoe_theme +
+                geom_richtext(size = 3,
+              aes (label = glue("*{comma(cumulative_enrollment, accuracy = 1) }*" ) ), 
+              fill = NA, label.color = NA,
+                   y = 0.002) +
+
   labs(title = ("Monterey County Suspension Rates By Racial Group"), # fn("K-12 Suspension Rates Over Time"),
-       caption = "Source: Suspension 2019-20 Data Files \n https://www.cde.ca.gov/ds/sd/sd/filessd.asp")
+       caption = "Source: Suspension 2019-20 Data Files \n https://www.cde.ca.gov/ds/sd/sd/filessd.asp") +
+  geom_textbox(x = 4, y = .04, fill = "lightgrey",
+               label = "African-Americans are suspended at a much higher rate than students in other racial groups.")
 
 
 ```
@@ -317,7 +411,15 @@ ggplot( aes( y = suspension_rate_total/100, x =fct_reorder(District, suspension_
   scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
   theme_hc() +
   mcoe_theme +
-  labs(title = ("K-12 Suspension Rates By District for African-Americans"),         caption = "Source: Suspension 2019-20 Data Files \n https://www.cde.ca.gov/ds/sd/sd/filessd.asp")
+              geom_richtext(size = 3,
+              aes (label = glue("*{comma(cumulative_enrollment, accuracy = 1) }*" ) ), 
+              fill = NA, label.color = NA,
+                   y = 0.008) +
+
+
+  labs(title = ("K-12 Suspension Rates By District for African-Americans"),         caption = "Source: Suspension 2019-20 Data Files \n https://www.cde.ca.gov/ds/sd/sd/filessd.asp") +
+  geom_textbox(x = 5, y = .1, fill = "lightgrey",
+               label = "The rate of suspensions varies greatly across districts.  Since some districts have low numbers of African-Americans enrolled, a single suspension can represent a large percentage.")
 
 
 ```
@@ -351,13 +453,150 @@ ggplot( aes( y = suspension_rate_total/100, x =fct_reorder(District, suspension_
   scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
   theme_hc() +
   mcoe_theme +
+                geom_richtext(size = 3,
+              aes (label = glue("*{comma(cumulative_enrollment, accuracy = 1) }*" ) ), 
+              fill = NA, label.color = NA,
+                   y = 0.01) +
+
   labs(title = ("K-12 Suspension Rates By District for Latinxs"), # fn("K-12 Suspension Rates Over Time"),
-       caption = "Source: Suspension 2019-20 Data Files \n https://www.cde.ca.gov/ds/sd/sd/filessd.asp")
+       caption = "Source: Suspension 2019-20 Data Files \n https://www.cde.ca.gov/ds/sd/sd/filessd.asp") +
+  geom_textbox(x = 9, y = .06, fill = "lightgrey",
+               label = "The rate of suspensions varies greatly across districts. South Monterey County Joint Union has the highest rate of suspensions of Latinx students of any district.")
 
 
 ```
 
 
+## Expulsions
+
+```{r expulsions}
+
+
+exp <- tbl(con,"EXP") %>% 
+  filter(county_code == 27,
+         academic_year == "2019-20",
+          charter_yn == "All" | is.na(charter_yn) | charter_yn == ""
+         ) %>%
+  collect() %>%
+  mutate(Geo = if_else(aggregate_level == "T", "California" ,county_name ))# %>%
+#  mutate_at(vars(cumulative_enrollment:suspension_count_other_reasons), funs(as.numeric) )
+
+exp_all <- exp %>%
+  filter( (aggregate_level == "T"  |county_code == 27),
+          reporting_category == "TA") 
+
+
+
+exp_sub <- exp %>%  
+  filter( is.na(district_code),
+    (county_code == 27),
+    academic_year == max(academic_year),
+    !is.na(expulsion_rate_total),
+    str_sub(reporting_category,1,1) == "R"
+ ) %>%
+  left_join_codebook("EXP","reporting_category") %>%
+    rename(ReportingCategory = reporting_category) %>%
+  mutate(exp.rate = 10000*total_expulsions/cumulative_enrollment ) 
+
+
+
+ggplot(exp_sub, aes( y = exp.rate, x =fct_reorder(definition, exp.rate) ,  label = comma(exp.rate, accuracy = .1))) +
+  geom_segment( aes(x=fct_reorder(definition, exp.rate), xend=fct_reorder(definition, exp.rate), y=0, yend=exp.rate),
+                color="orange",
+                size =2 ) +
+  geom_point( color="orange", size=5, alpha=0.6) +
+#  facet_grid(facets = vars(StudentGroupCategory), scales = "free" ) +
+  coord_flip() +
+  geom_text(size = 3, color = "black") +
+  scale_y_continuous() +
+  theme_hc() +
+  mcoe_theme +
+              #   geom_richtext(size = 3,
+              # aes (label = glue("*{comma(cumulative_enrollment, accuracy = 1) }*" ) ), 
+              # fill = NA, label.color = NA,
+              #      y = 0.002) +
+
+  labs(title = ("Monterey County Expulsion Rates By Racial Group"),
+       subtitle = "Expulsions per 10,000 students",
+       caption = "Source: Expulsion 2019-20 Data Files \n https://www.cde.ca.gov/ds/ad/filesed.asp") +
+  geom_textbox(x = 4, y = 5, fill = "lightgrey",
+               label = "African-Americans are expelled at a higher rate than other racial groups, however, the African-American and White categories each represent only a single student each. There were 25 expulsions total in 2019-20.")
+
+
+```
+
+
+## AP courses
+
+``` {r AP}
+
+ap <- tbl(con,"AP") %>% 
+    filter(
+        year == "2019-20",
+        cname == "Monterey"
+        # Grade == "13",
+        # County_Code == 27,
+        # School_Code == "0000000",
+        # Subgroup_ID == 1 | Subgroup_ID >70 & Subgroup_ID <81
+    ) %>%
+#    head(50) %>%
+    collect()
+
+ap.county <- ap %>%
+  filter(rtype == "C") %>%
+  filter(studentgroup %notin% c("EL","FOS","HOM", "SED", "SWD")) %>%
+  left_join_codebook("AP","studentgroup") %>%
+  mutate(perc.take = 100*numtsttakr/enroll1012,
+         high.scorers = 100*(numscr4=numscr5)/numtsttakr)
+
+
+ap.county %>%
+      lollipop(y_var = perc.take,
+             x_var = definition,
+             colorme = "orange") +
+      # geom_text(size = 3,
+      #         aes (label = denom),
+      #              y = 0.05) +
+              #     geom_richtext(size = 3,
+              # aes (label = glue("*{comma(denom, accuracy = 1) }*" ) ), 
+              # fill = NA, label.color = NA,
+              #      y = 0.05) +
+
+    labs(title = "AP Test Takers Out of 10-12 Grade Enrollment" ,
+         caption = "Source: Postsecondary Preparation Data Files for 2019-20\nhttps://www.cde.ca.gov/ds/sp/ai/") +
+  geom_textbox(x = 3, y = .3, fill = "lightgrey",
+               label = "Multiracial students are most likely to take an AP test, while African-American students are the least likely racial group.")
+
+
+
+```
+
+##
+
+``` {r ap-high}
+
+
+ap.county %>%
+  filter(!is.na(high.scorers)) %>%
+      lollipop(y_var = high.scorers,
+             x_var = definition,
+             colorme = "orange") +
+      # geom_text(size = 3,
+      #         aes (label = denom),
+      #              y = 0.05) +
+              #     geom_richtext(size = 3,
+              # aes (label = glue("*{comma(denom, accuracy = 1) }*" ) ), 
+              # fill = NA, label.color = NA,
+              #      y = 0.05) +
+
+    labs(title = "AP Test Takers who Score 4 or 5" ,
+         caption = "Source: Postsecondary Preparation Data Files for 2019-20\nhttps://www.cde.ca.gov/ds/sp/ai/") +
+  geom_textbox(x = 3, y = .26, fill = "lightgrey",
+               label = "Of students who take an AP test, Multiracial students  are most likely to score a 4 or a 5.")
+
+
+
+```
 
 
 
@@ -390,21 +629,6 @@ codebook.caaspp <- sbac.all %>%
 
 
 
-lollipop <- function(df, y_var, x_var, colorme) {
-  ggplot(df, aes( y = {{y_var}}/100, x =fct_reorder({{x_var}}, {{y_var}}) ,  label = percent({{y_var}}/100, accuracy = .1))) +
-  geom_segment( aes(x=fct_reorder({{x_var}}, {{y_var}}/100), xend=fct_reorder({{x_var}}, {{y_var}}/100), y=0, yend={{y_var}}/100),
-                color=colorme,
-                size =2 ) +
-  geom_point( color=colorme, size=5, alpha=0.6) +
-  coord_flip() +
-  geom_text(size = 3, color = "black") +
-  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
-#  facet_grid(facets = vars(`Student Group`), scales = "free" ) +
-  theme_hc() +
-  mcoe_theme
-}
-
-
 caaspp_lollipop <- function(testy, district, students, df) {
     
     if (testy == 2) {test <- "Math"} else {test <- "ELA"}
@@ -434,38 +658,44 @@ caaspp_lollipop(df = codebook.caaspp,
                 students = 74,
                 testy = 1,
                 district = FALSE
-)
+)  +
+  geom_textbox(x = 3, y = .6, fill = "lightgrey",
+               label = "There are large differences in the degree of success our county is having in preparing students of various racial groups to meet or exceed standards on standardized tests.")
 
 
 
 
 
 ```
-
-##
-
-```{r ela-latinx}
-
-caaspp_lollipop(df = codebook.caaspp,
-                students = 74,
-                testy = 1,
-                district = TRUE
-)
-
-
-
-```
-
 
 ##
 
 ```{r ela-black}
 
 caaspp_lollipop(df = codebook.caaspp,
+                students = 74,
+                testy = 1,
+                district = TRUE
+) +
+  geom_textbox(x = 2.75, y = .63, fill = "lightgrey",
+               label = "There are large differences in the degree of success our county is having in preparing African-American students to meet or exceed standards on standardized ELA tests.  For example Pacific Grove and Soledad have more than double the rates of Salinas City and Monterey Peninsula.")
+
+
+
+```
+
+
+##
+
+```{r ela-latinx}
+
+caaspp_lollipop(df = codebook.caaspp,
                 students = 78,
                 testy = 1,
                 district = TRUE
-)
+) +
+  geom_textbox(x = 8, y = .55, fill = "lightgrey",
+               label = "There are large differences in the degree of success our county is having in preparing Latinx students to meet or exceed standards on standardized ELA tests. For example Pacific Grove and Lagunita have more than double the rates of San Lucas and San Ardo.")
 
 
 
@@ -480,22 +710,9 @@ caaspp_lollipop(df = codebook.caaspp,
                 students = 74,
                 testy = 2,
                 district = FALSE
-)
-
-
-
-```
-
-
-##
-
-```{r math-latinx}
-
-caaspp_lollipop(df = codebook.caaspp,
-                students = 74,
-                testy = 2,
-                district = TRUE
-)
+) +
+  geom_textbox(x = 3, y = .5, fill = "lightgrey",
+               label = "There are large differences in the degree of success our county is having in preparing students of various racial groups to meet or exceed standards on standardized Math tests.")
 
 
 
@@ -507,10 +724,29 @@ caaspp_lollipop(df = codebook.caaspp,
 ```{r math-black}
 
 caaspp_lollipop(df = codebook.caaspp,
+                students = 74,
+                testy = 2,
+                district = TRUE
+) +
+  geom_textbox(x = 3, y = .4, fill = "lightgrey",
+               label = "There are large differences in the degree of success our county is having in preparing African-American students to meet or exceed standards on standardized Math tests. For example Soledad and Alisal have more than double the rates of Monterey Peninsula and Salinas City.")
+
+
+
+```
+
+
+##
+
+```{r math-latinx}
+
+caaspp_lollipop(df = codebook.caaspp,
                 students = 78,
                 testy = 2,
                 district = TRUE
-)
+) +
+  geom_textbox(x = 7, y = .4, fill = "lightgrey",
+               label = "There are large differences in the degree of success our county is having in preparing Latinx students to meet or exceed standards on standardized Math tests. For example Graves and Pacific Grove have more than five times the rates of San Lucas and San Ardo.")
 
 
 
@@ -535,13 +771,23 @@ cci_county <- cci %>%
     group_by(studentgroup) %>%
     summarise(denom = sum(currdenom, na.rm = TRUE), num = sum(curr_prep, na.rm = TRUE)) %>%
     mutate(perc = 100*num/denom) %>%
-    left_join_codebook("DASH_CCI","studentgroup")
+    left_join_codebook("DASH_CCI","studentgroup") 
 
 cci_county %>%
     lollipop(y_var = perc,
              x_var = definition,
              colorme = "orange") +
-    labs(caption = "Source: CA Dashboard Additional Reports 2020 College-Career Data Files\nhttps://www.cde.ca.gov/ta/ac/cm/datafiles2020.asp")
+      # geom_text(size = 3,
+      #         aes (label = denom),
+      #              y = 0.05) +
+                  geom_richtext(size = 3,
+              aes (label = glue("*{comma(denom, accuracy = 1) }*" ) ), 
+              fill = NA, label.color = NA,
+                   y = 0.05) +
+
+    labs(caption = "Source: CA Dashboard Additional Reports 2020 College-Career Data Files\nhttps://www.cde.ca.gov/ta/ac/cm/datafiles2020.asp") +
+  geom_textbox(x = 3, y = .55, fill = "lightgrey",
+               label = "The italicized number is the total number of students in the group, not only those who are prepared.  There are large differences in the degree of success our county is having in preparing students for college or careers with Pacific Islanders and American Indians having the lowest levels.")
 
 ```
 
@@ -555,7 +801,13 @@ cci %>%
     lollipop(y_var = curr_prep_pct,
              x_var = districtname,
              colorme = "lightblue") +
-    labs(caption = "Source: CA Dashboard Additional Reports 2020 College-Career Data Files\nhttps://www.cde.ca.gov/ta/ac/cm/datafiles2020.asp")
+                  geom_richtext(size = 3,
+              aes (label = glue("*{comma(currdenom, accuracy = 1) }*" ) ), 
+              fill = NA, label.color = NA,
+                   y = 0.05) +
+    labs(caption = "Source: CA Dashboard Additional Reports 2020 College-Career Data Files\nhttps://www.cde.ca.gov/ta/ac/cm/datafiles2020.asp") +
+  geom_textbox(x = 1.5, y = .5, fill = "lightgrey",
+               label = "Salinas Union has higher rates of preparing African- American students for college or careers than Monterey Peninsula.")
 
 
 ```
@@ -569,7 +821,13 @@ cci %>%
     lollipop(y_var = curr_prep_pct,
              x_var = districtname,
              colorme = "lightgreen") +
-    labs(caption = "Source: CA Dashboard Additional Reports 2020 College-Career Data Files\nhttps://www.cde.ca.gov/ta/ac/cm/datafiles2020.asp")
+                  geom_richtext(size = 3,
+              aes (label = glue("*{comma(currdenom, accuracy = 1) }*" ) ), 
+              fill = NA, label.color = NA,
+                   y = 0.03) +
+    labs(caption = "Source: CA Dashboard Additional Reports 2020 College-Career Data Files\nhttps://www.cde.ca.gov/ta/ac/cm/datafiles2020.asp") +
+  geom_textbox(x = 3, y = .55, fill = "lightgrey",
+               label = "There are large differences in the degree of success our county is having in preparing Latinx students for college or careers.  For example, Pacific Grove and Carmel are much higher than Salinas Union or Monterey County Office of Education.")
 
 
 ```
@@ -605,8 +863,18 @@ lollipop(
          y_var = CGR12,
          x_var = definition,
          colorme = "orange") +
+          # geom_text(size = 3,
+          #     aes (label = High_School_Completers),
+          #          y = 0.05) +
+                    geom_richtext(size = 3,
+              aes (label = glue("*{comma(High_School_Completers, accuracy = 1) }*" ) ), 
+              fill = NA, label.color = NA,
+                   y = 0.05) +
+
   labs(#title = ("College-Going Rate"),
-       caption = "Source: College-Going Rate for 2017-18 HS Completers (12-month) \n  https://www.cde.ca.gov/ds/ad/pse.asp") 
+       caption = "Source: College-Going Rate for 2017-18 HS Completers (12-month) \n  https://www.cde.ca.gov/ds/ad/pse.asp") +
+  geom_textbox(x = 3, y = .7, fill = "lightgrey",
+               label = "Asian students are much more likely than Pacific Islander students to go to college.")
 
 
 
@@ -629,8 +897,18 @@ lollipop(
          y_var = CGR12,
          x_var = DistrictName,
          colorme = "lightblue") +
+            # geom_text(size = 3,
+            #   aes (label = High_School_Completers),
+            #        y = 0.05) +
+                      geom_richtext(size = 3,
+              aes (label = glue("*{comma(High_School_Completers, accuracy = 1) }*" ) ), 
+              fill = NA, label.color = NA,
+                   y = 0.05) +
+
   labs(title = ("College-Going Rate by District for African-Americans "),
-       caption = "Source: College-Going Rate for 2017-18 HS Completers (12-month) \n  https://www.cde.ca.gov/ds/ad/pse.asp") 
+       caption = "Source: College-Going Rate for 2017-18 HS Completers (12-month) \n  https://www.cde.ca.gov/ds/ad/pse.asp") +
+  geom_textbox(x = 2.5, y = .4, fill = "lightgrey",
+               label = "Monterey Peninsula has higher rates of African-American students going to college than Salinas Union.")
 
 
 ```
@@ -650,15 +928,198 @@ lollipop(
          y_var = CGR12,
          x_var = DistrictName,
          colorme = "lightgreen") +
+            # geom_text(size = 3,
+            #   aes (label = High_School_Completers),
+            #        y = 0.05) +
+                        geom_richtext(size = 3,
+              aes (label = glue("*{comma(High_School_Completers, accuracy = 1) }*" ) ), 
+              fill = NA, label.color = NA,
+                   y = 0.05) +
   labs(title = ("College-Going Rate by District for Latinxs "),
-       caption = "Source: College-Going Rate for 2017-18 HS Completers (12-month) \n  https://www.cde.ca.gov/ds/ad/pse.asp") 
+       caption = "Source: College-Going Rate for 2017-18 HS Completers (12-month) \n  https://www.cde.ca.gov/ds/ad/pse.asp") +
+  geom_textbox(x = 2, y = .66, fill = "lightgrey",
+               label = "There are large differences in the rate at which Latinx students go to college. For example, Carmel and Gonzales have much higher rates than Monterey County Office of Education and North Monterey County.")
 
 
 ```
 
+``` {r tableua, include = FALSE} 
 ## Interaction College Data
 
-https://public.tableau.com/app/profile/tulare.county.office.of.education/viz/CaliforniaPostsecondaryDataExplorer/Menu
+# https://public.tableau.com/app/profile/tulare.county.office.of.education/viz/CaliforniaPostsecondaryDataExplorer/Menu
+
+```
+
+## Special Populations
+
+```{r homeless}
+
+homeless <- tbl(con, "UPC") %>%
+  filter(county_name == "Monterey",
+         academic_year == "2020-2021") %>%
+ # head() %>%
+  collect()
+  
+
+homeless.sum <- homeless %>%
+  group_by(district_name) %>%
+  transmute(homeless.tot = sum(homeless),
+            foster.tot = sum(foster),
+            migrant.tot = sum(migrant_program),
+            tot.tot = sum(total_enrollment),
+            homeless.perc = 100*homeless.tot/tot.tot,
+            foster.perc = 1000*foster.tot/tot.tot,
+            migrant.perc = 100*migrant.tot/tot.tot) %>%
+  distinct(  )
+
+
+
+homeless.sum %>%
+lollipop(
+         y_var = homeless.perc,
+         x_var = district_name,
+         colorme = "orange") +
+
+  labs(title = ("Percent of Reported Homeless Students by District"),
+       caption = "Source: CALPADS Unduplicated Pupil Count for 2020-21\n  https://www.cde.ca.gov/ds/ad/filescupc.asp") +
+  geom_textbox(x = 9, y = .25, fill = "lightgrey",
+               label = "The rates of homelessness and how different districts interpret McKinney-Vento laws varies greatly.  This results in reported rates ranging from no homeless students to more than a third of students being reported as homeless.")
+
+
+
+```
+
+
+##
+
+``` {r foster}
+
+
+homeless.sum %>%
+# lollipop(
+#          y_var = foster.perc,
+#          x_var = district_name,
+#          colorme = "orange") +
+
+  ggplot( aes( y = foster.perc, x =fct_reorder(district_name, foster.perc) ,  label = comma(foster.perc, accuracy = .1))) +
+  geom_segment( aes(x=fct_reorder(district_name, foster.perc), xend=fct_reorder(district_name, foster.perc), y=0, yend=foster.perc),
+                color="orange",
+                size =2 ) +
+  geom_point( color="orange", size=5, alpha=0.6) +
+#  facet_grid(facets = vars(StudentGroupCategory), scales = "free" ) +
+  coord_flip() +
+  geom_text(size = 3, color = "black") +
+  scale_y_continuous() +
+  theme_hc() +
+  mcoe_theme +
+
+  
+  labs(title = ("Reported Foster Students per Thousand by District"),
+       caption = "Source: CALPADS Unduplicated Pupil Count for 2020-21\n  https://www.cde.ca.gov/ds/ad/filescupc.asp") +
+  geom_textbox(x = 9, y = 7.5, fill = "lightgrey",
+               label = "Foster students represents less than half a percent of students in all but one districts. Foster youth often need additional support in navigating school success.")
+
+
+
+
+```
+
+
+##
+
+``` {r migrant}
+
+
+homeless.sum %>%
+lollipop(
+         y_var = migrant.perc,
+         x_var = district_name,
+         colorme = "orange") +
+
+  labs(title = ("Percent of Migrant Students by District"),
+       caption = "Source: CALPADS Unduplicated Pupil Count for 2020-21\n  https://www.cde.ca.gov/ds/ad/filescupc.asp") +
+  geom_textbox(x = 10, y = .1, fill = "lightgrey",
+               label = "Migrant students are in about half of Montery County districts.")
+
+
+
+
+```
+
+
+##
+
+``` {r homeless-race}
+
+homeless.race <- data.frame(
+                  stringsAsFactors = FALSE,
+                  African.American = c(1.0),
+  American.Indian.or.Alaska.Native = c(0.3),
+                             Asian = c(0.7),
+                          Filipino = c(1.0),
+                Hispanic.or.Latino = c(92.3),
+                  Pacific.Islander = c(0.4),
+                             White = c(3.1),
+                 Two.or.More.Races = c(0.7),
+                      Not.Reported = c(0.4)
+) %>% t() %>% 
+  as.data.frame() %>%
+  rownames_to_column("race") %>%
+  rename(perc = V1) 
+
+homeless.race %>%
+lollipop(
+         y_var = perc,
+         x_var = race,
+         colorme = "orange") +
+
+  labs(title = ("Percent of Reported Homeless Students by Race"),
+       caption = "Source: Dataquest export for 2020-21\n  https://data1.cde.ca.gov/dataquest/dqcensus/EnrEthLevels.aspx?cds=27&agglevel=county&year=2020-21") +
+  geom_textbox(x = 6, y = .5, fill = "lightgrey",
+               label = "The large majority of reported homeless students are Hispanic or Latino.")
+
+
+
+```
+
+
+##
+
+``` {r foster-race}
+
+foster.race <- 
+  
+  data.frame(
+                  stringsAsFactors = FALSE,
+                  African.American = c(4.2),
+  American.Indian.or.Alaska.Native = c(0.7),
+                             Asian = c(0.0),
+                          Filipino = c(0.7),
+                Hispanic.or.Latino = c(77.1),
+                  Pacific.Islander = c(0.0),
+                             White = c(13.2),
+                 Two.or.More.Races = c(0.7),
+                      Not.Reported = c(3.5)
+  )  %>% 
+  t() %>% 
+  as.data.frame() %>%
+  rownames_to_column("race") %>%
+  rename(perc = V1) 
+
+foster.race %>%
+lollipop(
+         y_var = perc,
+         x_var = race,
+         colorme = "orange") +
+
+  labs(title = ("Percent of Reported Foster Students by Race"),
+       caption = "Source: Dataquest export for 2020-21\n  https://data1.cde.ca.gov/dataquest/dqcensus/EnrEthLevels.aspx?cds=27&agglevel=county&year=2020-21") +
+  geom_textbox(x = 6, y = .5, fill = "lightgrey",
+               label = "The  majority of reported foster students are Hispanic or Latino.")
+
+
+
+```
 
 ## MCOE Efforts
 
@@ -667,6 +1128,18 @@ https://public.tableau.com/app/profile/tulare.county.office.of.education/viz/Cal
 - National Equity Project
 - etc. 
 
-## Clubs and Progams 
 
+##  Transfers to Alternative Programs
 
+- I don't know how to find this information? 
+- Demographics of alternative schools and compared to overall is included above  
+
+## College Board
+
+- I emailed and they said they would discuss internally and get back to me. 
+- They have not yet. 
+
+## Migrant Ed
+
+- I emailed Constantino.  
+- I received an auto-reply message saying he was out of the office. 
