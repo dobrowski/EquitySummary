@@ -1121,25 +1121,30 @@ lollipop(
 
 ```
 
-## MCOE Efforts
 
-- African-American Leadership Council
-- ALL IN for Equity
-- National Equity Project
-- etc. 
+``` {r notes, include = FALSE}
+# 
+# ## MCOE Efforts
+# 
+# - African-American Leadership Council
+# - ALL IN for Equity
+# - National Equity Project
+# - etc. 
+# 
+# 
+# ##  Transfers to Alternative Programs
+# 
+# - I don't know how to find this information? 
+# - Demographics of alternative schools and compared to overall is included above  
+# 
+# ## College Board
+# 
+# - I emailed and they said they would discuss internally and get back to me. 
+# - They have not yet. 
+# 
+# ## Migrant Ed
+# 
+# - I emailed Constantino.  
+# - I received an auto-reply message saying he was out of the office. 
 
-
-##  Transfers to Alternative Programs
-
-- I don't know how to find this information? 
-- Demographics of alternative schools and compared to overall is included above  
-
-## College Board
-
-- I emailed and they said they would discuss internally and get back to me. 
-- They have not yet. 
-
-## Migrant Ed
-
-- I emailed Constantino.  
-- I received an auto-reply message saying he was out of the office. 
+```
