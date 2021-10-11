@@ -358,26 +358,93 @@ susp_sub <- susp_vroom %>%
 
 
 
-ggplot(susp_sub, aes( y = suspension_rate_total/100, x =fct_reorder(definition, suspension_rate_total) ,  label = percent(suspension_rate_total/100, accuracy = .1))) +
-  geom_segment( aes(x=fct_reorder(definition, suspension_rate_total), xend=fct_reorder(definition, suspension_rate_total), y=0, yend=suspension_rate_total/100),
-                color="orange",
-                size =2 ) +
-  geom_point( color="orange", size=5, alpha=0.6) +
-#  facet_grid(facets = vars(StudentGroupCategory), scales = "free" ) +
-  coord_flip() +
-  geom_text(size = 3, color = "black") +
-  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
-  theme_hc() +
-  mcoe_theme +
+susp_sub %>%
+      lollipop(y_var = suspension_rate_total,
+             x_var = definition,
+             colorme = "orange") +
                 geom_richtext(size = 3,
-              aes (label = glue("*{comma(cumulative_enrollment, accuracy = 1) }*" ) ), 
+              aes (label =  glue("*{comma(unduplicated_count_of_students_suspended_total, accuracy = 1) } of {comma(cumulative_enrollment, accuracy = 1) }*" ) ), 
               fill = NA, label.color = NA,
                    y = 0.002) +
 
-  labs(title = ("Monterey County Suspension Rates By Racial Group"), # fn("K-12 Suspension Rates Over Time"),
+  labs(title = ("Percentage of Students Suspended By Racial Group"), # fn("K-12 Suspension Rates Over Time"),
        caption = "Source: Suspension 2019-20 Data Files \n https://www.cde.ca.gov/ds/sd/sd/filessd.asp") +
-  geom_textbox(x = 4, y = .04, fill = "lightgrey",
+  geom_textbox(x = 4, y = .035, fill = "lightgrey",
                label = "African-Americans are suspended at a much higher rate than students in other racial groups.")
+
+
+```
+
+
+
+## 
+
+
+```{r susp-racial}
+
+susp_sub %>%
+  mutate(count_susp = sum(unduplicated_count_of_students_suspended_total),
+         race_perc = unduplicated_count_of_students_suspended_total/count_susp) %>%
+        # lollipop(y_var = race_perc,
+        #      x_var = definition,
+        #      colorme = "orange")
+
+ggplot( aes(x = reorder(definition, race_perc ),
+                       y = race_perc,
+                       label = percent(race_perc, accuracy = 0.1),
+                       fill = definition 
+                       )) +
+    geom_col() +
+    mcoe_theme +
+        scale_fill_brewer(palette = "Paired") +
+coord_flip() + 
+    scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+
+    geom_text(size = 3, show.legend = FALSE) +
+        guides(fill = guide_legend(label.position = "bottom",
+                               nrow = 3,
+                               keywidth = 10,
+                               label.vjust = 10)) +
+
+  labs(title = ("Of Students Suspended, Percentage from each Racial Group"), 
+       caption = "Source: Suspension 2019-20 Data Files \n https://www.cde.ca.gov/ds/sd/sd/filessd.asp") +
+  geom_textbox(x = 4, y = .5, fill = "lightgrey",
+               label = "Latinx and African-American students represent a greater portion of students who are suspended than the total student population.")
+
+
+```
+
+
+## 
+
+
+```{r susp-multiple}
+
+susp_sub %>%
+  mutate(repeat.rate = total_suspensions/unduplicated_count_of_students_suspended_total) %>%
+ggplot( aes( y = repeat.rate, x =fct_reorder(definition, repeat.rate) ,  label = comma(repeat.rate, accuracy = .01))) +
+  geom_segment( aes(x=fct_reorder(definition, repeat.rate), xend=fct_reorder(definition, repeat.rate), y=0, yend=repeat.rate),
+                color="orange",
+                size =2 ) +
+  geom_point( color="orange", size=5, alpha=0.6) +
+  coord_flip() +
+  geom_text(size = 3, color = "black") +
+  scale_y_continuous(labels = scales::comma_format(accuracy = .1)) +
+  theme_hc() +
+  mcoe_theme +
+                geom_richtext(size = 3,
+              aes (label =  glue("*{comma(total_suspensions, accuracy = 1) } suspensions for {comma(unduplicated_count_of_students_suspended_total, accuracy = 1) } students*" ) ), 
+              fill = NA, label.color = NA,
+                   y = 0.2) +
+
+  labs(title = ("Monterey County Repeat Suspensions By Racial Group"), # fn("K-12 Suspension Rates Over Time"),
+       caption = "Source: Suspension 2019-20 Data Files \n https://www.cde.ca.gov/ds/sd/sd/filessd.asp") +
+  geom_textbox(x = 6.5, y = .8, fill = "lightgrey",
+               label = "Latino students who had been suspended in 2019-20 were suspended one and a half times on average.")
+
+
+
+
 
 
 ```
@@ -399,20 +466,11 @@ susp_vroom %>%
     left_join(entit) %>%
     mutate(District = if_else(is.na(District),"Monterey County",District)) %>%
 
-
-ggplot( aes( y = suspension_rate_total/100, x =fct_reorder(District, suspension_rate_total) ,  label = percent(suspension_rate_total/100, accuracy = .1))) +
-  geom_segment( aes(x=fct_reorder(District, suspension_rate_total), xend=fct_reorder(District, suspension_rate_total), y=0, yend=suspension_rate_total/100),
-                color="lightblue",
-                size =2 ) +
-  geom_point( color="lightblue", size=5, alpha=0.6) +
-#  facet_grid(facets = vars(StudentGroupCategory), scales = "free" ) +
-  coord_flip() +
-  geom_text(size = 3, color = "black") +
-  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
-  theme_hc() +
-  mcoe_theme +
-              geom_richtext(size = 3,
-              aes (label = glue("*{comma(cumulative_enrollment, accuracy = 1) }*" ) ), 
+      lollipop(y_var = suspension_rate_total,
+             x_var = District,
+             colorme = "lightblue") +
+                geom_richtext(size = 3,
+              aes (label =  glue("*{comma(unduplicated_count_of_students_suspended_total, accuracy = 1) } of {comma(cumulative_enrollment, accuracy = 1) }*" ) ), 
               fill = NA, label.color = NA,
                    y = 0.008) +
 
@@ -454,17 +512,68 @@ ggplot( aes( y = suspension_rate_total/100, x =fct_reorder(District, suspension_
   theme_hc() +
   mcoe_theme +
                 geom_richtext(size = 3,
-              aes (label = glue("*{comma(cumulative_enrollment, accuracy = 1) }*" ) ), 
+              aes (label =  glue("*{comma(unduplicated_count_of_students_suspended_total, accuracy = 1) } of {comma(cumulative_enrollment, accuracy = 1) }*" ) ), 
               fill = NA, label.color = NA,
-                   y = 0.01) +
+                   y = 0.07) +
 
   labs(title = ("K-12 Suspension Rates By District for Latinxs"), # fn("K-12 Suspension Rates Over Time"),
        caption = "Source: Suspension 2019-20 Data Files \n https://www.cde.ca.gov/ds/sd/sd/filessd.asp") +
-  geom_textbox(x = 9, y = .06, fill = "lightgrey",
+  geom_textbox(x = 9, y = .035, fill = "lightgrey",
                label = "The rate of suspensions varies greatly across districts. South Monterey County Joint Union has the highest rate of suspensions of Latinx students of any district.")
 
 
 ```
+
+
+
+## 
+
+```{r susp-swd}
+
+susp_vroom %>%  
+  filter( aggregate_level %in% c("C","D"),
+    academic_year == max(academic_year),
+    reporting_category == "SD",
+    !is.na(suspension_rate_total)
+ ) %>%
+  left_join_codebook("SUSP","reporting_category") %>%
+    rename(ReportingCategory = reporting_category) %>%
+ mutate(cds = paste0(county_code,district_code,school_code)) %>%
+    left_join(entit) %>%
+    mutate(District = if_else(is.na(District),"Monterey County",District)) %>%
+
+      lollipop(y_var = suspension_rate_total,
+             x_var = District,
+             colorme = "hotpink") +
+                geom_richtext(size = 3,
+              aes (label =  glue("*{comma(unduplicated_count_of_students_suspended_total, accuracy = 1) } of {comma(cumulative_enrollment, accuracy = 1) }*" ) ), 
+              fill = NA, label.color = NA,
+                   y = 0.008) +
+
+
+  labs(title = ("K-12 Suspension Rates By District for Students with Disabilities"),         caption = "Source: Suspension 2019-20 Data Files \n https://www.cde.ca.gov/ds/sd/sd/filessd.asp") +
+  geom_textbox(x = 5, y = .06, fill = "lightgrey",
+               label = "The rate of suspensions varies greatly across districts.  South Monterey County Joint Union has the highest rate of suspensions of students with disabilities of any district.")
+
+
+```
+
+
+
+
+## Demo notes 
+
+- Census population comparison
+- How do people report race/ethnicity
+- Should I filter only to teachers ?  
+- This is only public school data (includes charters but not private)
+- Does not include ECE students 
+
+
+## Suspension Notes
+
+- Is this cumulative enrollment? YES 
+- Single year presented
 
 
 ## Expulsions
@@ -597,6 +706,14 @@ ap.county %>%
 
 
 ```
+
+## AP Notes
+
+- College Board does not include total enrollments, so rates by racial group are not available 
+- There are big drops in 2020 and even more substantial drops in 2021. 
+- They use scores of 3,4 or 5 versus what I did of 4 or 5
+- Exams taken by race are similar but don't match CDE numbers exactly
+- SAT numbers dropped to almost none in 2021
 
 
 
