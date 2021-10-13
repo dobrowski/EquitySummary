@@ -23,6 +23,7 @@ library(ggthemes)
 library(googlesheets4)
 library(scales)
 library(ggtext)
+library(tidycensus)
 
 options(scipen=999)
 
@@ -321,6 +322,50 @@ coord_flip() +
 
 ```
 
+## Census Data
+
+``` {r census}
+
+# age10 <- get_decennial(geography = "state", 
+#                        variables = "P013001", 
+#                        year = 2020)
+
+census <- data.frame(
+  stringsAsFactors = TRUE,
+              race = c("African American or Black alone","American Indian and Alaska Native alone","Asian alone",
+                       
+                       "Hispanic or Latino",
+                       "Pacific Islander and Native Hawaiian alone","Two or More Races",
+                       "White alone, not Hispanic or Latino", "Filipino", "Not Reported"),
+           percent = c(3.4,2.6,6.7,
+                       59.4,0.6,3.8,29.4,NA,NA)
+) %>% 
+  mutate(race = fct_inorder(race))
+
+
+
+ggplot(census, aes(x = reorder(race, percent ),
+                       y = percent/100,
+                       label = percent(percent/100, accuracy = 0.1),
+                       fill = race 
+                       )) +
+    geom_col() +
+    mcoe_theme +
+        scale_fill_brewer(palette = "Paired") +
+coord_flip() + 
+    geom_text(size = 3, show.legend = FALSE) +
+        guides(fill = guide_legend(label.position = "bottom",
+                               nrow = 3,
+                               keywidth = 10,
+                               label.vjust = 10)) +
+    labs(title = "Monterey County Total Population by Race",
+         caption = "Source: US Census QuickFacts\nhttps://www.census.gov/quickfacts/fact/table/montereycountycalifornia,US/PST045219?") +
+  geom_textbox(x = 5, y = 500, fill = "lightgrey",
+               label = "Students are enrolled in Alternative Schools of Choice, Community Day Schools, County Community Schools, and Continuation Schools at very similar percentages as the overall student body.")
+
+
+```
+
 ## Notes on Data
 
 - All figures have a citation in the bottom right with the url to the public data source provided by California Department of Education where the data is found as well as identifying what year the data represents. 
@@ -374,7 +419,6 @@ susp_sub %>%
 
 
 ```
-
 
 
 ## 
@@ -525,7 +569,6 @@ ggplot( aes( y = suspension_rate_total/100, x =fct_reorder(District, suspension_
 ```
 
 
-
 ## 
 
 ```{r susp-swd}
@@ -559,11 +602,8 @@ susp_vroom %>%
 ```
 
 
-
-
 ## Demo notes 
 
-- Census population comparison
 - How do people report race/ethnicity
 - Should I filter only to teachers ?  
 - This is only public school data (includes charters but not private)
@@ -703,6 +743,74 @@ ap.county %>%
   geom_textbox(x = 3, y = .26, fill = "lightgrey",
                label = "Of students who take an AP test, Multiracial students  are most likely to score a 4 or a 5.")
 
+
+
+```
+
+##
+
+
+``` {r college-board}
+
+ap.college.board <- tribble( ~"race", ~"students", ~"taken", ~"passed",
+        "Asian",177, 361, 146,
+        "Black",16, 24,4,
+        "Hispanic or Latino",1845, 2974, 926,
+        "Pacific Islander",6, 10, 0,
+        "White",527, 1016, 601,
+        "Two or more races",101, 182, 97,
+        "No response",45, 72, 35
+        ) %>%
+  mutate(perc = 100*passed/taken,
+         repeats = taken/students)
+
+
+ap.college.board %>%
+      lollipop(y_var = perc,
+             x_var = race,
+             colorme = "orange") +
+      # geom_text(size = 3,
+      #         aes (label = denom),
+      #              y = 0.05) +
+              #     geom_richtext(size = 3,
+              # aes (label = glue("*{comma(denom, accuracy = 1) }*" ) ), 
+              # fill = NA, label.color = NA,
+              #      y = 0.05) +
+
+    labs(title = "AP Tests Scoring 3, 4 or 5" ,
+         caption = "Source: College Board Integrated Dashboard File 2021") +
+  geom_textbox(x = 3, y = .26, fill = "lightgrey",
+               label = "Of students who take an AP test, White students  are most likely to score a 3, 4 or a 5.")
+
+
+```
+
+##
+
+``` {r college-repeat}
+
+
+ap.college.board %>%
+ggplot( aes( y = repeats, x =fct_reorder(race, repeats) ,  label = comma(repeats, accuracy = .1))) +
+  geom_segment( aes(x=fct_reorder(race, repeats), xend=fct_reorder(race, repeats), y=0, yend=repeats),
+                color="orange",
+                size =2 ) +
+  geom_point( color="orange", size=5, alpha=0.6) +
+#  facet_grid(facets = vars(StudentGroupCategory), scales = "free" ) +
+  coord_flip() +
+  geom_text(size = 3, color = "black") +
+  scale_y_continuous() +
+  theme_hc() +
+  mcoe_theme +
+              #   geom_richtext(size = 3,
+              # aes (label = glue("*{comma(cumulative_enrollment, accuracy = 1) }*" ) ), 
+              # fill = NA, label.color = NA,
+              #      y = 0.002) +
+
+    labs(title = "Number of AP tests taken per person" ,
+         caption = "Source: College Board Integrated Dashboard File 2021") +
+  geom_textbox(x = 3, y = .26, fill = "lightgrey",
+               label = "Of students who take an AP test, White students are most likely to take multiple tests.")
 
 
 ```
@@ -890,6 +998,7 @@ cci_county <- cci %>%
     mutate(perc = 100*num/denom) %>%
     left_join_codebook("DASH_CCI","studentgroup") 
 
+
 cci_county %>%
     lollipop(y_var = perc,
              x_var = definition,
@@ -898,7 +1007,7 @@ cci_county %>%
       #         aes (label = denom),
       #              y = 0.05) +
                   geom_richtext(size = 3,
-              aes (label = glue("*{comma(denom, accuracy = 1) }*" ) ), 
+              aes (label = glue("*{comma(num, accuracy = 1) } of {comma(denom, accuracy = 1) }*" ) ), 
               fill = NA, label.color = NA,
                    y = 0.05) +
 
@@ -919,7 +1028,7 @@ cci %>%
              x_var = districtname,
              colorme = "lightblue") +
                   geom_richtext(size = 3,
-              aes (label = glue("*{comma(currdenom, accuracy = 1) }*" ) ), 
+              aes (label = glue(" *{comma(curr_prep, accuracy = 1)}* *of* *{comma(currdenom, accuracy = 1) }*" ) ),
               fill = NA, label.color = NA,
                    y = 0.05) +
     labs(caption = "Source: CA Dashboard Additional Reports 2020 College-Career Data Files\nhttps://www.cde.ca.gov/ta/ac/cm/datafiles2020.asp") +
@@ -939,9 +1048,9 @@ cci %>%
              x_var = districtname,
              colorme = "lightgreen") +
                   geom_richtext(size = 3,
-              aes (label = glue("*{comma(currdenom, accuracy = 1) }*" ) ), 
+              aes (label = glue(" *{comma(curr_prep, accuracy = 1)}* *of* *{comma(currdenom, accuracy = 1) }*" ) ),
               fill = NA, label.color = NA,
-                   y = 0.03) +
+                   y = 0.2) +
     labs(caption = "Source: CA Dashboard Additional Reports 2020 College-Career Data Files\nhttps://www.cde.ca.gov/ta/ac/cm/datafiles2020.asp") +
   geom_textbox(x = 3, y = .55, fill = "lightgrey",
                label = "There are large differences in the degree of success our county is having in preparing Latinx students for college or careers.  For example, Pacific Grove and Carmel are much higher than Salinas Union or Monterey County Office of Education.")
@@ -984,7 +1093,7 @@ lollipop(
           #     aes (label = High_School_Completers),
           #          y = 0.05) +
                     geom_richtext(size = 3,
-              aes (label = glue("*{comma(High_School_Completers, accuracy = 1) }*" ) ), 
+              aes (label = glue("*{comma(Enrolled_In_College_Total_12_Months, accuracy = 1) } out of {comma(High_School_Completers, accuracy = 1) }*" ) ), 
               fill = NA, label.color = NA,
                    y = 0.05) +
 
@@ -1018,7 +1127,7 @@ lollipop(
             #   aes (label = High_School_Completers),
             #        y = 0.05) +
                       geom_richtext(size = 3,
-              aes (label = glue("*{comma(High_School_Completers, accuracy = 1) }*" ) ), 
+              aes (label = glue("*{comma(Enrolled_In_College_Total_12_Months, accuracy = 1) } out of {comma(High_School_Completers, accuracy = 1) }*" ) ), 
               fill = NA, label.color = NA,
                    y = 0.05) +
 
@@ -1049,7 +1158,7 @@ lollipop(
             #   aes (label = High_School_Completers),
             #        y = 0.05) +
                         geom_richtext(size = 3,
-              aes (label = glue("*{comma(High_School_Completers, accuracy = 1) }*" ) ), 
+              aes (label = glue("*{comma(Enrolled_In_College_Total_12_Months, accuracy = 1) } out of {comma(High_School_Completers, accuracy = 1) }*" ) ), 
               fill = NA, label.color = NA,
                    y = 0.05) +
   labs(title = ("College-Going Rate by District for Latinxs "),
