@@ -4,9 +4,7 @@ author: "MCOE"
 date: "Compiled on `r format(Sys.Date(), '%B %d, %Y ' )`"
 output:
   beamer_presentation: default
-  slidy_presentation: default
-  ioslides_presentation: default
-  powerpoint_presentation: default
+classoption: letter
 ---
 
 ```{r setup, include=FALSE}
@@ -219,7 +217,7 @@ coord_flip() +
                                label.vjust = 10)) +
     labs(caption = "Source: Census Day Enrollment 2020-21 Data Files\nhttps://www.cde.ca.gov/ds/ad/filesenr.asp") +
   geom_textbox(x = 5, y = 50000, fill = "lightgrey",
-               label = "In contrast to the certified staff, the large majority of students are Hispanic or Latino. Latinxs represent four out of five students in Monterey County. Less than two percent of students are African-American.")
+               label = "In contrast to the certified staff, the large majority of students are Hispanic or Latino. Latinxs represent four out of five students in public schools in Monterey County. Less than two percent of students are African-American.")
     
 
 
@@ -696,7 +694,7 @@ ap.county <- ap %>%
   filter(studentgroup %notin% c("EL","FOS","HOM", "SED", "SWD")) %>%
   left_join_codebook("AP","studentgroup") %>%
   mutate(perc.take = 100*numtsttakr/enroll1012,
-         high.scorers = 100*(numscr4=numscr5)/numtsttakr)
+         high.scorers = 100*(numscr3+numscr4+numscr5)/numtsttakr)
 
 
 ap.county %>%
@@ -722,7 +720,7 @@ ap.county %>%
 
 ##
 
-``` {r ap-high}
+``` {r ap-high, include = FALSE}
 
 
 ap.county %>%
@@ -738,7 +736,7 @@ ap.county %>%
               # fill = NA, label.color = NA,
               #      y = 0.05) +
 
-    labs(title = "AP Test Takers who Score 4 or 5" ,
+    labs(title = "AP Test Takers who Score 3, 4 or 5" ,
          caption = "Source: Postsecondary Preparation Data Files for 2019-20\nhttps://www.cde.ca.gov/ds/sp/ai/") +
   geom_textbox(x = 3, y = .26, fill = "lightgrey",
                label = "Of students who take an AP test, Multiracial students  are most likely to score a 4 or a 5.")
@@ -779,7 +777,7 @@ ap.college.board %>%
 
     labs(title = "AP Tests Scoring 3, 4 or 5" ,
          caption = "Source: College Board Integrated Dashboard File 2021") +
-  geom_textbox(x = 3, y = .26, fill = "lightgrey",
+  geom_textbox(x = 3, y = .35, fill = "lightgrey",
                label = "Of students who take an AP test, White students  are most likely to score a 3, 4 or a 5.")
 
 
@@ -823,6 +821,10 @@ ggplot( aes( y = repeats, x =fct_reorder(race, repeats) ,  label = comma(repeats
 - Exams taken by race are similar but don't match CDE numbers exactly
 - SAT numbers dropped to almost none in 2021
 
+##
+
+- Add number of students for CAASPP testing
+
 
 
 ## CAASPP ELA Testing
@@ -843,7 +845,8 @@ sbac.all <- tbl(con,"CAASPP") %>%
     collect()
 
 codebook.caaspp <- sbac.all %>%
-    mutate(Subgroup_ID = as.character(Subgroup_ID)) %>%
+    mutate(Subgroup_ID = as.character(Subgroup_ID),
+           Students_Tested = as.numeric(Students_Tested)) %>%
     left_join_codebook("CAASPP","Subgroup_ID") %>%
     mutate(Percentage_Standard_Met_and_Above = as.numeric(Percentage_Standard_Met_and_Above),
            cds = paste0(County_Code,District_Code,School_Code)) %>%
@@ -870,7 +873,12 @@ caaspp_lollipop <- function(testy, district, students, df) {
     lollipop(y_var = Percentage_Standard_Met_and_Above,
              x_var = case_when(district == FALSE ~ definition,
                          district == TRUE ~ District),
-             colorful) +
+             colorful) + 
+  geom_richtext(size = 3,
+              aes (label =  glue("*of {comma(Students_Tested, accuracy = 1) }*" ) ),
+              fill = NA, 
+              label.color = NA,
+              y = 0.04)  +
   labs(title = (paste0("Percentage Meeting and Exceeding Standards for ",test,   case_when(district == FALSE ~ " Countywide by Racial Group",
           district == TRUE & students == 74 ~ " by District for African-Americans",
           district == TRUE & students == 78 ~ " by District for Latinxs" )
@@ -885,7 +893,8 @@ caaspp_lollipop(df = codebook.caaspp,
                 district = FALSE
 )  +
   geom_textbox(x = 3, y = .6, fill = "lightgrey",
-               label = "There are large differences in the degree of success our county is having in preparing students of various racial groups to meet or exceed standards on standardized tests.")
+               label = "There are large differences in the degree of success our county is having in preparing students of various racial groups to meet or exceed standards on standardized tests.") 
+
 
 
 
@@ -1205,10 +1214,14 @@ lollipop(
          y_var = homeless.perc,
          x_var = district_name,
          colorme = "orange") +
+                        geom_richtext(size = 3,
+              aes (label = glue("*{comma(homeless.tot, accuracy = 1) } out of {comma(tot.tot, accuracy = 1) }*" ) ), 
+              fill = NA, label.color = NA,
+                   y = 0.32) +
 
   labs(title = ("Percent of Reported Homeless Students by District"),
        caption = "Source: CALPADS Unduplicated Pupil Count for 2020-21\n  https://www.cde.ca.gov/ds/ad/filescupc.asp") +
-  geom_textbox(x = 9, y = .25, fill = "lightgrey",
+  geom_textbox(x = 9, y = .20, fill = "lightgrey",
                label = "The rates of homelessness and how different districts interpret McKinney-Vento laws varies greatly.  This results in reported rates ranging from no homeless students to more than a third of students being reported as homeless.")
 
 
@@ -1238,11 +1251,15 @@ homeless.sum %>%
   scale_y_continuous() +
   theme_hc() +
   mcoe_theme +
+                        geom_richtext(size = 3,
+              aes (label = glue("*{comma(foster.tot, accuracy = 1) } out of {comma(tot.tot, accuracy = 1) }*" ) ), 
+              fill = NA, label.color = NA,
+                   y = 8) +
 
   
   labs(title = ("Reported Foster Students per Thousand by District"),
        caption = "Source: CALPADS Unduplicated Pupil Count for 2020-21\n  https://www.cde.ca.gov/ds/ad/filescupc.asp") +
-  geom_textbox(x = 9, y = 7.5, fill = "lightgrey",
+  geom_textbox(x = 9, y = 3, fill = "lightgrey",
                label = "Foster students represents less than half a percent of students in all but one districts. Foster youth often need additional support in navigating school success.")
 
 
@@ -1261,10 +1278,14 @@ lollipop(
          y_var = migrant.perc,
          x_var = district_name,
          colorme = "orange") +
+                        geom_richtext(size = 3,
+              aes (label = glue("*{comma(migrant.tot, accuracy = 1) } out of {comma(tot.tot, accuracy = 1) }*" ) ), 
+              fill = NA, label.color = NA,
+                   y = 0.105) +
 
   labs(title = ("Percent of Migrant Students by District"),
        caption = "Source: CALPADS Unduplicated Pupil Count for 2020-21\n  https://www.cde.ca.gov/ds/ad/filescupc.asp") +
-  geom_textbox(x = 10, y = .1, fill = "lightgrey",
+  geom_textbox(x = 10, y = .06, fill = "lightgrey",
                label = "Migrant students are in about half of Montery County districts.")
 
 
@@ -1298,6 +1319,10 @@ lollipop(
          y_var = perc,
          x_var = race,
          colorme = "orange") +
+              #           geom_richtext(size = 3,
+              # aes (label = glue("*{comma(Enrolled_In_College_Total_12_Months, accuracy = 1) } out of {comma(High_School_Completers, accuracy = 1) }*" ) ), 
+              # fill = NA, label.color = NA,
+              #      y = 0.05) +
 
   labs(title = ("Percent of Reported Homeless Students by Race"),
        caption = "Source: Dataquest export for 2020-21\n  https://data1.cde.ca.gov/dataquest/dqcensus/EnrEthLevels.aspx?cds=27&agglevel=county&year=2020-21") +
@@ -1337,6 +1362,10 @@ lollipop(
          y_var = perc,
          x_var = race,
          colorme = "orange") +
+              #           geom_richtext(size = 3,
+              # aes (label = glue("*{comma(Enrolled_In_College_Total_12_Months, accuracy = 1) } out of {comma(High_School_Completers, accuracy = 1) }*" ) ), 
+              # fill = NA, label.color = NA,
+              #      y = 0.05) +
 
   labs(title = ("Percent of Reported Foster Students by Race"),
        caption = "Source: Dataquest export for 2020-21\n  https://data1.cde.ca.gov/dataquest/dqcensus/EnrEthLevels.aspx?cds=27&agglevel=county&year=2020-21") +
