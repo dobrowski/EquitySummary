@@ -821,10 +821,6 @@ ggplot( aes( y = repeats, x =fct_reorder(race, repeats) ,  label = comma(repeats
 - Exams taken by race are similar but don't match CDE numbers exactly
 - SAT numbers dropped to almost none in 2021
 
-##
-
-- Add number of students for CAASPP testing
-
 
 
 ## CAASPP ELA Testing
@@ -875,7 +871,7 @@ caaspp_lollipop <- function(testy, district, students, df) {
                          district == TRUE ~ District),
              colorful) + 
   geom_richtext(size = 3,
-              aes (label =  glue("*of {comma(Students_Tested, accuracy = 1) }*" ) ),
+              aes (label =  glue("*{comma( Percentage_Standard_Met_and_Above*Students_Tested/100, accuracy = 1)} of {comma(Students_Tested, accuracy = 1) }*" ) ),
               fill = NA, 
               label.color = NA,
               y = 0.04)  +
