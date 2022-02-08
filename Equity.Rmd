@@ -128,7 +128,7 @@ ggplot( aes(x = reorder(definition, total ),
         #                        label.vjust = 10)) +
     labs(caption = "Source: Staff Demographic 2018-19 Data Files\nhttps://www.cde.ca.gov/ds/ad/staffdemo.asp") +
   geom_textbox(x = 3, y = 1500, fill = "lightgrey",
-               label = "The majority of certified staff in Monterey County are White.  A quarter of certified staff are Latino and less then two percent are African American.")
+               label = "The majority of certified staff in Monterey County are White.  A quarter of certified staff are Latino and less than two percent are African American.")
 
 
 
