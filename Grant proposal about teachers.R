@@ -92,3 +92,27 @@ staff.color <- staff_demo2 %>%
     
     
         
+    
+    upc <- tbl(con, "UPC")  %>%
+         filter( county_name == "Monterey"|county_name =="San Benito"|county_name =="Santa Cruz",
+                 academic_year == "2020-2021"
+         ) %>%
+ #       head(5) %>%
+        collect()
+    
+    
+    upc2 <- upc %>%
+        group_by(district_name) %>%
+        transmute(school_name,
+                  total_enrollment,
+                  calpads_unduplicated_pupil_count_upc,
+                  perc = sum(calpads_unduplicated_pupil_count_upc)/sum(total_enrollment))
+
+    
+    upc3 <- upc2 %>%
+        select(district_name, perc) %>%
+        unique()
+
+    
+    write_csv(upc3, here("grant","Perc Undup By District.csv"))
+    
